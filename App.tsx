@@ -44,7 +44,7 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Filter stage 1: Time filter only (for high-level cards)
+  // Filter stage 1: Time filter only (The baseline for everything)
   const timeFilteredData = useMemo(() => {
     if (rawData.length === 0) return [];
 
@@ -88,15 +88,10 @@ const App: React.FC = () => {
     });
   }, [rawData, activeFilter]);
 
-  // Filter stage 2: Brand + Drilldown (for details/charts)
-  const finalFilteredData = useMemo(() => {
+  // Filter stage 2: Drilldown (Search/Unit/System)
+  // This data will be used for the Top Stats Cards
+  const drillDownFilteredData = useMemo(() => {
     let data = [...timeFilteredData];
-
-    if (selectedBrand !== 'grupo trigo') {
-      data = data.filter(item => 
-        (item.marca?.toLowerCase() || '').includes(selectedBrand.toLowerCase())
-      );
-    }
 
     if (drillDown.type && drillDown.value) {
       const type = drillDown.type;
@@ -111,9 +106,25 @@ const App: React.FC = () => {
     }
 
     return data;
-  }, [timeFilteredData, selectedBrand, drillDown]);
+  }, [timeFilteredData, drillDown]);
 
-  const statsForGrid = useMemo(() => calculateStats(timeFilteredData), [timeFilteredData]);
+  // Filter stage 3: Brand selection
+  // This final data is for the charts
+  const finalFilteredData = useMemo(() => {
+    let data = [...drillDownFilteredData];
+
+    if (selectedBrand !== 'grupo trigo') {
+      data = data.filter(item => 
+        (item.marca?.toLowerCase() || '').includes(selectedBrand.toLowerCase())
+      );
+    }
+
+    return data;
+  }, [drillDownFilteredData, selectedBrand]);
+
+  // Use drillDownFilteredData for cards so they react to store search
+  const statsForGrid = useMemo(() => calculateStats(drillDownFilteredData), [drillDownFilteredData]);
+  // Use finalFilteredData for charts so they react to both store and brand
   const statsForCharts = useMemo(() => calculateStats(finalFilteredData), [finalFilteredData]);
 
   const allUniqueStores = useMemo(() => {
@@ -131,7 +142,7 @@ const App: React.FC = () => {
 
   const handleBrandClick = (brandKey: string) => {
     setSelectedBrand(brandKey);
-    setDrillDown({ type: null, value: null });
+    // Keep the unit filter active when switching brands
   };
 
   const handleStoreSelect = (store: string) => {
