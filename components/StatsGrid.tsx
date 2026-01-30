@@ -14,8 +14,8 @@ const StatsGrid: React.FC<StatsGridProps> = ({ stats, selectedBrand, onBrandClic
     { name: 'Spoleto', key: 'spoleto', color: 'text-brand-spoleto' },
     { name: 'China in Box', key: 'china', color: 'text-brand-china' },
     { name: 'Gendai', key: 'gendai', color: 'text-brand-gendai' },
-    { name: 'Asa', key: 'asa', color: 'text-brand-asa' },
     { name: 'Koni', key: 'koni', color: 'text-brand-koni' },
+    { name: 'Asa', key: 'asa', color: 'text-brand-asa' },
   ];
 
   const getBrandCount = (brandSearch: string) => {
