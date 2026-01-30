@@ -1,0 +1,249 @@
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { fetchData, calculateStats } from './services/dataService';
+import { TicketData, DashboardStats } from './types';
+import Header from './components/Header';
+import StatsGrid from './components/StatsGrid';
+import { 
+  SystemDistribution, 
+  TopReasons, 
+  TopStores, 
+  PeriodDistribution 
+} from './components/Charts';
+
+const App: React.FC = () => {
+  const [rawData, setRawData] = useState<TicketData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState('Este Mês');
+  const [selectedBrand, setSelectedBrand] = useState('Grupo Trigo');
+  const [drillDown, setDrillDown] = useState<{ type: string | null; value: string | null }>({
+    type: null,
+    value: null
+  });
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchData();
+        if (data.length === 0) {
+          setError("Nenhum dado encontrado na planilha.");
+        } else {
+          setRawData(data);
+        }
+      } catch (err) {
+        setError("Erro ao carregar os dados.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+    const interval = setInterval(loadData, 300000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const filteredData = useMemo(() => {
+    if (rawData.length === 0) return [];
+
+    const agora = new Date();
+    const dataLimite = new Date(agora);
+    dataLimite.setHours(23, 59, 59, 999);
+
+    return rawData.filter(item => {
+      // 1. Time Filter
+      if (!item.data_abertura) return false;
+      
+      const parts = item.data_abertura.split(/[-/]/).map(Number);
+      if (parts.length < 3) return false;
+      
+      const [dia, mes, ano] = parts;
+      const dataTicket = new Date(ano, mes - 1, dia);
+
+      if (dataTicket > dataLimite) return false;
+
+      let timePass = false;
+      if (activeFilter === 'Hoje') {
+        timePass = dataTicket.toDateString() === agora.toDateString();
+      } else if (activeFilter === 'Últimos 7 Dias') {
+        const seteDiasAtras = new Date(agora);
+        seteDiasAtras.setDate(agora.getDate() - 7);
+        seteDiasAtras.setHours(0, 0, 0, 0);
+        timePass = dataTicket >= seteDiasAtras;
+      } else if (activeFilter === 'Este Mês') {
+        timePass = dataTicket.getMonth() === agora.getMonth() && 
+                   dataTicket.getFullYear() === agora.getFullYear();
+      } else if (activeFilter === 'Trimestral') {
+        const tresMesesAtras = new Date(agora);
+        tresMesesAtras.setMonth(agora.getMonth() - 3);
+        tresMesesAtras.setHours(0, 0, 0, 0);
+        timePass = dataTicket >= tresMesesAtras;
+      } else if (activeFilter === 'Anual') {
+        const umAnoAtras = new Date(agora);
+        umAnoAtras.setFullYear(agora.getFullYear() - 1);
+        umAnoAtras.setHours(0, 0, 0, 0);
+        timePass = dataTicket >= umAnoAtras;
+      }
+
+      if (!timePass) return false;
+
+      // 2. Brand Filter
+      if (selectedBrand !== 'Grupo Trigo') {
+        const itemBrand = item.marca?.toLowerCase() || '';
+        if (!itemBrand.includes(selectedBrand.toLowerCase())) return false;
+      }
+
+      // 3. Drill Down Filter
+      if (drillDown.type && drillDown.value) {
+        const key = drillDown.type as keyof TicketData;
+        const itemVal = item[key]?.toString() || '';
+        
+        if (drillDown.type === 'sistema') {
+          const s = item.sistema?.toUpperCase() || '';
+          if (!s.includes(drillDown.value.toUpperCase())) return false;
+        } else {
+          if (itemVal !== drillDown.value) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [rawData, activeFilter, selectedBrand, drillDown]);
+
+  const stats = useMemo(() => {
+    return calculateStats(filteredData);
+  }, [filteredData]);
+
+  const handleDrillDown = (type: string, value: string) => {
+    if (drillDown.type === type && drillDown.value === value) {
+      setDrillDown({ type: null, value: null });
+    } else {
+      setDrillDown({ type, value });
+    }
+  };
+
+  const handleBrandClick = (brand: string) => {
+    setSelectedBrand(brand);
+    setDrillDown({ type: null, value: null });
+  };
+
+  const clearAllFilters = () => {
+    setDrillDown({ type: null, value: null });
+    setSelectedBrand('Grupo Trigo');
+    setActiveFilter('Este Mês');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background-dark flex flex-col items-center justify-center text-white p-8">
+        <div className="relative">
+          <div className="size-24 border-4 border-slate-800 border-t-primary rounded-full animate-spin"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="material-symbols-outlined text-primary text-3xl">monitoring</span>
+          </div>
+        </div>
+        <p className="mt-8 text-lg font-medium animate-pulse">Sincronizando com SAF Arcanjos...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col min-h-screen bg-background-dark text-slate-100 selection:bg-primary/30">
+      <Header 
+        activeFilter={activeFilter} 
+        onFilterChange={setActiveFilter} 
+      />
+      
+      <main className="flex-1 p-4 md:p-8 max-w-[1440px] mx-auto w-full">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
+          <div className="flex flex-col">
+            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+              <span className="size-2.5 bg-green-500 rounded-full animate-pulse"></span>
+              Performance Geral
+            </h1>
+            <div className="flex items-center gap-2 text-sm text-secondary-text mt-1">
+              <span>Análise de chamados:</span>
+              <span className="bg-slate-800 px-2 py-0.5 rounded text-white font-medium">{activeFilter}</span>
+              {selectedBrand !== 'Grupo Trigo' && (
+                <span className="bg-primary/20 text-primary px-2 py-0.5 rounded font-medium">Marca: {selectedBrand}</span>
+              )}
+              {drillDown.value && (
+                <span className="bg-accent-cyan/20 text-accent-cyan px-2 py-0.5 rounded font-medium">Filtro: {drillDown.value}</span>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {(drillDown.value || selectedBrand !== 'Grupo Trigo' || activeFilter !== 'Este Mês') && (
+              <button 
+                onClick={clearAllFilters}
+                className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 transition-colors uppercase tracking-widest bg-red-400/10 px-3 py-1.5 rounded-lg border border-red-400/20"
+              >
+                <span className="material-symbols-outlined text-sm">filter_alt_off</span>
+                Limpar Filtros
+              </button>
+            )}
+            <div className="text-right hidden sm:block">
+              <p className="text-xs text-secondary-text uppercase tracking-widest font-bold">Última atualização</p>
+              <p className="text-sm font-bold text-accent-cyan">{new Date().toLocaleTimeString()}</p>
+            </div>
+          </div>
+        </div>
+
+        <StatsGrid 
+          stats={stats} 
+          selectedBrand={selectedBrand} 
+          onBrandClick={handleBrandClick}
+        />
+
+        {stats.totalTickets === 0 ? (
+          <div className="bg-surface-dark p-12 rounded-xl border border-slate-800 text-center my-8">
+            <span className="material-symbols-outlined text-slate-600 text-6xl mb-4">query_stats</span>
+            <h3 className="text-xl font-bold text-slate-400">Nenhum dado encontrado com esses filtros</h3>
+            <button 
+              onClick={clearAllFilters}
+              className="text-primary hover:underline mt-2 text-sm font-bold"
+            >
+              Resetar todos os filtros
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+              <SystemDistribution 
+                stats={stats} 
+                onDrillDown={handleDrillDown} 
+                activeDrill={drillDown}
+              />
+              <TopReasons 
+                stats={stats} 
+                onDrillDown={handleDrillDown} 
+                activeDrill={drillDown}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <TopStores 
+                stats={stats} 
+                onDrillDown={handleDrillDown} 
+                activeDrill={drillDown}
+              />
+              <PeriodDistribution 
+                stats={stats} 
+                onDrillDown={handleDrillDown} 
+                activeDrill={drillDown}
+              />
+            </div>
+          </>
+        )}
+      </main>
+
+      <footer className="p-8 text-center text-slate-600 text-xs font-medium border-t border-slate-800 mt-8">
+        &copy; {new Date().getFullYear()} Controle de Acionamentos SAF Arcanjos. Dados via Google Sheets API.
+      </footer>
+    </div>
+  );
+};
+
+export default App;
