@@ -116,6 +116,11 @@ const App: React.FC = () => {
   const statsForGrid = useMemo(() => calculateStats(timeFilteredData), [timeFilteredData]);
   const statsForCharts = useMemo(() => calculateStats(finalFilteredData), [finalFilteredData]);
 
+  const allUniqueStores = useMemo(() => {
+    const stores = rawData.map(item => item.unidade).filter(Boolean);
+    return Array.from(new Set(stores)).sort();
+  }, [rawData]);
+
   const handleDrillDown = (type: string, value: string) => {
     if (drillDown.type === type && drillDown.value === value) {
       setDrillDown({ type: null, value: null });
@@ -127,6 +132,10 @@ const App: React.FC = () => {
   const handleBrandClick = (brandKey: string) => {
     setSelectedBrand(brandKey);
     setDrillDown({ type: null, value: null });
+  };
+
+  const handleStoreSelect = (store: string) => {
+    setDrillDown({ type: 'unidade', value: store });
   };
 
   const clearAllFilters = () => {
@@ -148,7 +157,9 @@ const App: React.FC = () => {
     <div className="flex flex-col min-h-screen bg-background-dark text-slate-100 selection:bg-primary/30">
       <Header 
         activeFilter={activeFilter} 
-        onFilterChange={setActiveFilter} 
+        onFilterChange={setActiveFilter}
+        allStores={allUniqueStores}
+        onStoreSelect={handleStoreSelect}
       />
       
       <main className="flex-1 p-4 md:p-8 max-w-[1440px] mx-auto w-full">

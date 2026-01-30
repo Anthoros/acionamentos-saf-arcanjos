@@ -125,9 +125,9 @@ export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeDri
   const maxVal = Math.max(...sortedReasons.map(r => r[1]), 1);
 
   return (
-    <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm h-[550px] flex flex-col">
+    <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm h-[550px] flex flex-col transition-all duration-300">
       <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-white overflow-hidden">
-        <span className="material-symbols-outlined text-primary shrink-0">
+        <span className="material-symbols-outlined text-primary shrink-0 transition-transform duration-300">
           {isDetailMode ? 'manage_search' : 'bar_chart'}
         </span>
         <span className="truncate">
@@ -136,37 +136,37 @@ export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeDri
         {isDetailMode && (
           <button 
             onClick={() => onDrillDown('categoria', activeDrill.value!)}
-            className="ml-auto text-[10px] bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded flex items-center gap-1 transition-colors shrink-0 font-black uppercase tracking-widest"
+            className="ml-auto text-[10px] bg-slate-700 hover:bg-primary text-white px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all shrink-0 font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-black/20"
           >
-            <span className="material-symbols-outlined text-[12px]">arrow_back</span>
+            <span className="material-symbols-outlined text-[14px]">arrow_back</span>
             VOLTAR
           </button>
         )}
       </h3>
-      <div className="flex flex-col justify-between flex-1 pb-2 gap-1">
+      <div className="flex flex-col justify-between flex-1 pb-2 gap-1 animate-in fade-in slide-in-from-bottom-2 duration-500">
         {sortedReasons.map(([name, count], idx) => (
           <button 
             key={idx} 
             onClick={() => !isDetailMode && onDrillDown('categoria', name)}
-            className={`relative w-full text-left group transition-all p-1 hover:bg-slate-800/30 rounded ${isDetailMode ? 'cursor-default' : 'cursor-pointer'}`}
+            className={`relative w-full text-left group transition-all p-1.5 rounded-lg ${isDetailMode ? 'cursor-default' : 'cursor-pointer hover:bg-slate-800/40'}`}
             disabled={isDetailMode}
           >
             <div className="flex justify-between text-[10px] mb-1 uppercase font-black tracking-tight">
-              <span className={`truncate pr-4 max-w-[80%] transition-colors ${activeDrill.value === name && !isDetailMode ? 'text-accent-cyan' : 'text-slate-400 group-hover:text-slate-200'}`}>{name}</span>
-              <span className="text-white shrink-0">{count}</span>
+              <span className={`truncate pr-4 max-w-[85%] transition-colors ${activeDrill.value === name && !isDetailMode ? 'text-accent-cyan' : 'text-slate-400 group-hover:text-slate-100'}`}>{name}</span>
+              <span className="text-white shrink-0 font-display">{count}</span>
             </div>
-            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div className="w-full bg-slate-900/50 h-2 rounded-full overflow-hidden border border-slate-800/50">
               <div 
-                className={`h-full rounded-full transition-all duration-1000 ${isDetailMode ? 'bg-accent-cyan' : 'bg-primary'}`} 
+                className={`h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(59,130,246,0.3)] ${isDetailMode ? 'bg-accent-cyan' : 'bg-primary'}`} 
                 style={{ width: `${(count / maxVal) * 100}%` }}
               ></div>
             </div>
           </button>
         ))}
         {sortedReasons.length === 0 && isDetailMode && (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 italic text-sm">
-            <span className="material-symbols-outlined text-4xl mb-2 opacity-20">search_off</span>
-            Sem detalhamento disponível
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 italic text-sm py-10">
+            <span className="material-symbols-outlined text-5xl mb-3 opacity-10">inventory_2</span>
+            Sem detalhamento disponível para esta categoria
           </div>
         )}
       </div>
@@ -229,7 +229,7 @@ export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
   });
 
   return (
-    <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm min-h-[600px] flex flex-col">
+    <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm h-[600px] flex flex-col">
       <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
         <span className="material-symbols-outlined text-primary">schedule</span>
         Volume por Período
@@ -239,8 +239,8 @@ export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
           <PieChart>
             <Pie
               data={data}
-              innerRadius={75}
-              outerRadius={115}
+              innerRadius={80}
+              outerRadius={125}
               paddingAngle={5}
               dataKey="value"
               onClick={(entry) => onDrillDown('turno', entry.name)}
@@ -263,19 +263,11 @@ export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
             <Legend 
               verticalAlign="bottom" 
               align="center" 
-              wrapperStyle={{ paddingTop: '10px', cursor: 'pointer' }}
+              wrapperStyle={{ paddingTop: '15px', cursor: 'pointer' }}
               onClick={(e) => onDrillDown('turno', e.value)}
             />
           </PieChart>
         </ResponsiveContainer>
-      </div>
-      <div className="grid grid-cols-4 gap-2 mt-6 border-t border-slate-800 pt-6">
-        {data.map((item, idx) => (
-          <div key={idx} className="text-center group">
-            <p className="text-[10px] font-black text-secondary-text uppercase truncate tracking-tighter transition-colors group-hover:text-white">{item.name}</p>
-            <p className="text-lg font-black text-white">{item.value}</p>
-          </div>
-        ))}
       </div>
     </div>
   );

@@ -10,11 +10,12 @@ export const fetchData = async (): Promise<TicketData[]> => {
     const csvText = await response.text();
     
     const lines = csvText.split('\n');
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    // Normalize headers by removing quotes and trimming
+    const headers = lines[0].replace(/"/g, '').split(',').map(h => h.trim().toLowerCase());
     
     return lines.slice(1).map(line => {
-      // Regex to split by comma while ignoring commas inside quotes
-      const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+      // Robust split that ignores commas inside quotes
+      const values = line.replace(/\r$/, '').split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
       const obj: any = {};
       headers.forEach((header, index) => {
         const val = values[index]?.replace(/^"|"$/g, '').trim() || '';
@@ -24,7 +25,6 @@ export const fetchData = async (): Promise<TicketData[]> => {
         else if (header === 'categoria') obj.categoria = val;
         else if (header === 'unidade') obj.unidade = val;
         else if (header === 'turno') obj.turno = val;
-        // Map 'detalhamento' by header name or by fixed index 8 (Column I)
         else if (header === 'detalhamento' || index === 8) obj.detalhamento = val;
         else obj[header] = val;
       });
@@ -51,7 +51,6 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
     const brand = item.marca || 'Unknown';
     stats.brandCounts[brand] = (stats.brandCounts[brand] || 0) + 1;
 
-    // Clean and normalize system names
     let system = 'OUTROS';
     if (item.sistema) {
       const s = item.sistema.toUpperCase();
@@ -81,9 +80,13 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
     const period = item.turno || 'Sem Turno';
     stats.periodCounts[period] = (stats.periodCounts[period] || 0) + 1;
 
-    // Enhanced detailing logic: ignores variations of "Sem detalhamento"
+    // Sanitized detailing logic
     const detail = item.detalhamento;
-    const isInvalid = !detail || detail.toLowerCase().includes('sem detalha') || detail.trim() === '';
+    const isInvalid = !detail || 
+                     detail.toLowerCase().includes('sem detalha') || 
+                     detail.toLowerCase() === 'null' ||
+                     detail.trim() === '';
+    
     if (!isInvalid) {
       stats.detailCounts[detail] = (stats.detailCounts[detail] || 0) + 1;
     }
