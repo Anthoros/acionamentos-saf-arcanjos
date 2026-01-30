@@ -13,16 +13,19 @@ export const fetchData = async (): Promise<TicketData[]> => {
     const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
     
     return lines.slice(1).map(line => {
-      const values = line.split(',');
+      // Regex to split by comma while ignoring commas inside quotes
+      const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
       const obj: any = {};
       headers.forEach((header, index) => {
-        const val = values[index]?.trim();
+        const val = values[index]?.replace(/^"|"$/g, '').trim() || '';
         if (header === 'data_abertura') obj.data_abertura = val;
         else if (header === 'marca') obj.marca = val;
         else if (header === 'sistema') obj.sistema = val;
         else if (header === 'categoria') obj.categoria = val;
         else if (header === 'unidade') obj.unidade = val;
         else if (header === 'turno') obj.turno = val;
+        // Map 'detalhamento' by header name or by fixed index 8 (Column I)
+        else if (header === 'detalhamento' || index === 8) obj.detalhamento = val;
         else obj[header] = val;
       });
       return obj as TicketData;
@@ -40,14 +43,15 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
     systemCounts: {},
     reasonCounts: {},
     storeCounts: {},
-    periodCounts: {}
+    periodCounts: {},
+    detailCounts: {}
   };
 
   data.forEach(item => {
     const brand = item.marca || 'Unknown';
     stats.brandCounts[brand] = (stats.brandCounts[brand] || 0) + 1;
 
-    // Clean and normalize system names to uppercase for color mapping consistency
+    // Clean and normalize system names
     let system = 'OUTROS';
     if (item.sistema) {
       const s = item.sistema.toUpperCase();
@@ -62,7 +66,6 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
       else if (s.includes('FIDELIDADE')) system = 'FIDELIDADE';
       else if (s.includes('MYORDERS')) system = 'MYORDERS';
       else {
-        // Fallback to the last word if it's a specific system name
         const parts = s.split(' ');
         system = parts[parts.length - 1] || 'OUTROS';
       }
@@ -77,6 +80,13 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
 
     const period = item.turno || 'Sem Turno';
     stats.periodCounts[period] = (stats.periodCounts[period] || 0) + 1;
+
+    // Enhanced detailing logic: ignores variations of "Sem detalhamento"
+    const detail = item.detalhamento;
+    const isInvalid = !detail || detail.toLowerCase().includes('sem detalha') || detail.trim() === '';
+    if (!isInvalid) {
+      stats.detailCounts[detail] = (stats.detailCounts[detail] || 0) + 1;
+    }
   });
 
   return stats;

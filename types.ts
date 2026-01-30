@@ -6,6 +6,7 @@ export interface TicketData {
   categoria: string;
   unidade: string;
   turno: string;
+  detalhamento: string;
 }
 
 export interface DashboardStats {
@@ -15,4 +16,5 @@ export interface DashboardStats {
   reasonCounts: Record<string, number>;
   storeCounts: Record<string, number>;
   periodCounts: Record<string, number>;
+  detailCounts: Record<string, number>;
 }

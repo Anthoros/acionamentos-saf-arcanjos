@@ -5,7 +5,7 @@ import { DashboardStats } from '../types';
 interface StatsGridProps {
   stats: DashboardStats;
   selectedBrand: string;
-  onBrandClick: (brand: string) => void;
+  onBrandClick: (brandKey: string) => void;
 }
 
 const StatsGrid: React.FC<StatsGridProps> = ({ stats, selectedBrand, onBrandClick }) => {
@@ -18,23 +18,26 @@ const StatsGrid: React.FC<StatsGridProps> = ({ stats, selectedBrand, onBrandClic
     { name: 'Koni', key: 'koni', color: 'text-brand-koni' },
   ];
 
-  const getBrandCount = (brandName: string) => {
-    const key = Object.keys(stats.brandCounts).find(
-      k => k.toLowerCase().includes(brandName.toLowerCase())
-    );
-    return key ? stats.brandCounts[key] : 0;
+  const getBrandCount = (brandSearch: string) => {
+    const total = Object.entries(stats.brandCounts).reduce((acc, [key, count]) => {
+      if (key.toLowerCase().includes(brandSearch.toLowerCase())) {
+        return acc + count;
+      }
+      return acc;
+    }, 0);
+    return total;
   };
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
       {brands.map((brand) => {
-        const isActive = selectedBrand.toLowerCase() === brand.key;
+        const isActive = selectedBrand.toLowerCase() === brand.key.toLowerCase();
         
         return (
           <button 
             key={brand.key} 
-            onClick={() => onBrandClick(brand.name)}
-            className={`p-6 rounded-xl border transition-all duration-300 text-left flex flex-col justify-between group h-32
+            onClick={() => onBrandClick(brand.key)}
+            className={`p-6 rounded-xl border transition-all duration-300 text-left flex flex-col justify-between group h-32 relative overflow-hidden
               ${isActive 
                 ? brand.isTotal 
                   ? 'bg-primary border-white ring-4 ring-primary/30 scale-105 z-10 shadow-2xl shadow-primary/40' 
@@ -42,7 +45,12 @@ const StatsGrid: React.FC<StatsGridProps> = ({ stats, selectedBrand, onBrandClic
                 : 'bg-surface-dark border-slate-800 opacity-60 hover:opacity-100 hover:border-slate-600'
               }`}
           >
-            <div className="flex items-center justify-between w-full">
+            {/* Background decoration */}
+            <div className={`absolute -right-4 -bottom-4 size-16 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity rotate-12 ${isActive ? 'opacity-10' : ''}`}>
+               <span className="material-symbols-outlined text-6xl">analytics</span>
+            </div>
+
+            <div className="flex items-center justify-between w-full relative z-10">
               <p className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-white' : brand.color}`}>
                 {brand.name}
               </p>
@@ -50,17 +58,15 @@ const StatsGrid: React.FC<StatsGridProps> = ({ stats, selectedBrand, onBrandClic
                 <span className="material-symbols-outlined text-sm text-white animate-pulse">check_circle</span>
               )}
             </div>
-            <div className="flex items-end justify-between mt-auto">
+            
+            <div className="flex items-end justify-between mt-auto relative z-10">
               <h3 className={`text-3xl font-bold ${isActive ? 'text-white' : 'text-slate-100'}`}>
-                {brand.isTotal ? stats.totalTickets.toLocaleString() : getBrandCount(brand.name).toLocaleString()}
+                {brand.isTotal ? stats.totalTickets.toLocaleString() : getBrandCount(brand.key).toLocaleString()}
               </h3>
               {!brand.isTotal && (
-                <span className={`material-symbols-outlined opacity-40 group-hover:opacity-100 transition-opacity ${brand.color}`}>
+                <span className={`material-symbols-outlined opacity-40 group-hover:opacity-100 transition-opacity ${isActive ? 'text-white' : brand.color}`}>
                   branding_watermark
                 </span>
-              )}
-              {brand.isTotal && (
-                <span className="material-symbols-outlined opacity-40 text-white">analytics</span>
               )}
             </div>
           </button>

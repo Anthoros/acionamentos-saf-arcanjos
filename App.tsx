@@ -15,8 +15,8 @@ const App: React.FC = () => {
   const [rawData, setRawData] = useState<TicketData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState('Este Mês');
-  const [selectedBrand, setSelectedBrand] = useState('Grupo Trigo');
+  const [activeFilter, setActiveFilter] = useState('Últimos 7 Dias');
+  const [selectedBrand, setSelectedBrand] = useState('grupo trigo'); // Store the key
   const [drillDown, setDrillDown] = useState<{ type: string | null; value: string | null }>({
     type: null,
     value: null
@@ -40,11 +40,12 @@ const App: React.FC = () => {
     };
 
     loadData();
-    const interval = setInterval(loadData, 300000);
+    const interval = setInterval(loadData, 300000); // 5 min auto-refresh
     return () => clearInterval(interval);
   }, []);
 
-  const filteredData = useMemo(() => {
+  // Filter stage 1: Time filter only (for high-level cards)
+  const timeFilteredData = useMemo(() => {
     if (rawData.length === 0) return [];
 
     const agora = new Date();
@@ -52,7 +53,6 @@ const App: React.FC = () => {
     dataLimite.setHours(23, 59, 59, 999);
 
     return rawData.filter(item => {
-      // 1. Time Filter
       if (!item.data_abertura) return false;
       
       const parts = item.data_abertura.split(/[-/]/).map(Number);
@@ -63,57 +63,58 @@ const App: React.FC = () => {
 
       if (dataTicket > dataLimite) return false;
 
-      let timePass = false;
       if (activeFilter === 'Hoje') {
-        timePass = dataTicket.toDateString() === agora.toDateString();
+        return dataTicket.toDateString() === agora.toDateString();
       } else if (activeFilter === 'Últimos 7 Dias') {
-        const seteDiasAtras = new Date(agora);
-        seteDiasAtras.setDate(agora.getDate() - 7);
-        seteDiasAtras.setHours(0, 0, 0, 0);
-        timePass = dataTicket >= seteDiasAtras;
+        const d = new Date(agora);
+        d.setDate(agora.getDate() - 7);
+        d.setHours(0, 0, 0, 0);
+        return dataTicket >= d;
       } else if (activeFilter === 'Este Mês') {
-        timePass = dataTicket.getMonth() === agora.getMonth() && 
-                   dataTicket.getFullYear() === agora.getFullYear();
+        return dataTicket.getMonth() === agora.getMonth() && 
+               dataTicket.getFullYear() === agora.getFullYear();
       } else if (activeFilter === 'Trimestral') {
-        const tresMesesAtras = new Date(agora);
-        tresMesesAtras.setMonth(agora.getMonth() - 3);
-        tresMesesAtras.setHours(0, 0, 0, 0);
-        timePass = dataTicket >= tresMesesAtras;
+        const d = new Date(agora);
+        d.setMonth(agora.getMonth() - 3);
+        d.setHours(0, 0, 0, 0);
+        return dataTicket >= d;
       } else if (activeFilter === 'Anual') {
-        const umAnoAtras = new Date(agora);
-        umAnoAtras.setFullYear(agora.getFullYear() - 1);
-        umAnoAtras.setHours(0, 0, 0, 0);
-        timePass = dataTicket >= umAnoAtras;
+        const d = new Date(agora);
+        d.setFullYear(agora.getFullYear() - 1);
+        d.setHours(0, 0, 0, 0);
+        return dataTicket >= d;
       }
-
-      if (!timePass) return false;
-
-      // 2. Brand Filter
-      if (selectedBrand !== 'Grupo Trigo') {
-        const itemBrand = item.marca?.toLowerCase() || '';
-        if (!itemBrand.includes(selectedBrand.toLowerCase())) return false;
-      }
-
-      // 3. Drill Down Filter
-      if (drillDown.type && drillDown.value) {
-        const key = drillDown.type as keyof TicketData;
-        const itemVal = item[key]?.toString() || '';
-        
-        if (drillDown.type === 'sistema') {
-          const s = item.sistema?.toUpperCase() || '';
-          if (!s.includes(drillDown.value.toUpperCase())) return false;
-        } else {
-          if (itemVal !== drillDown.value) return false;
-        }
-      }
-
       return true;
     });
-  }, [rawData, activeFilter, selectedBrand, drillDown]);
+  }, [rawData, activeFilter]);
 
-  const stats = useMemo(() => {
-    return calculateStats(filteredData);
-  }, [filteredData]);
+  // Filter stage 2: Brand + Drilldown (for details/charts)
+  const finalFilteredData = useMemo(() => {
+    let data = [...timeFilteredData];
+
+    if (selectedBrand !== 'grupo trigo') {
+      data = data.filter(item => 
+        (item.marca?.toLowerCase() || '').includes(selectedBrand.toLowerCase())
+      );
+    }
+
+    if (drillDown.type && drillDown.value) {
+      const type = drillDown.type;
+      const val = drillDown.value;
+      data = data.filter(item => {
+        if (type === 'sistema') {
+          return (item.sistema?.toUpperCase() || '').includes(val.toUpperCase());
+        }
+        const key = type as keyof TicketData;
+        return item[key] === val;
+      });
+    }
+
+    return data;
+  }, [timeFilteredData, selectedBrand, drillDown]);
+
+  const statsForGrid = useMemo(() => calculateStats(timeFilteredData), [timeFilteredData]);
+  const statsForCharts = useMemo(() => calculateStats(finalFilteredData), [finalFilteredData]);
 
   const handleDrillDown = (type: string, value: string) => {
     if (drillDown.type === type && drillDown.value === value) {
@@ -123,27 +124,22 @@ const App: React.FC = () => {
     }
   };
 
-  const handleBrandClick = (brand: string) => {
-    setSelectedBrand(brand);
+  const handleBrandClick = (brandKey: string) => {
+    setSelectedBrand(brandKey);
     setDrillDown({ type: null, value: null });
   };
 
   const clearAllFilters = () => {
     setDrillDown({ type: null, value: null });
-    setSelectedBrand('Grupo Trigo');
-    setActiveFilter('Este Mês');
+    setSelectedBrand('grupo trigo');
+    setActiveFilter('Últimos 7 Dias');
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-background-dark flex flex-col items-center justify-center text-white p-8">
-        <div className="relative">
-          <div className="size-24 border-4 border-slate-800 border-t-primary rounded-full animate-spin"></div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="material-symbols-outlined text-primary text-3xl">monitoring</span>
-          </div>
-        </div>
-        <p className="mt-8 text-lg font-medium animate-pulse">Sincronizando com SAF Arcanjos...</p>
+        <div className="size-20 border-4 border-slate-800 border-t-primary rounded-full animate-spin"></div>
+        <p className="mt-8 text-lg font-medium animate-pulse uppercase tracking-widest">Carregando Dashboard...</p>
       </div>
     );
   }
@@ -156,68 +152,76 @@ const App: React.FC = () => {
       />
       
       <main className="flex-1 p-4 md:p-8 max-w-[1440px] mx-auto w-full">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
           <div className="flex flex-col">
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <span className="size-2.5 bg-green-500 rounded-full animate-pulse"></span>
-              Performance Geral
+            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+              <span className="size-3 bg-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/20"></span>
+              Visão Geral de Operações
             </h1>
-            <div className="flex items-center gap-2 text-sm text-secondary-text mt-1">
-              <span>Análise de chamados:</span>
-              <span className="bg-slate-800 px-2 py-0.5 rounded text-white font-medium">{activeFilter}</span>
-              {selectedBrand !== 'Grupo Trigo' && (
-                <span className="bg-primary/20 text-primary px-2 py-0.5 rounded font-medium">Marca: {selectedBrand}</span>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-secondary-text mt-2">
+              <span className="flex items-center gap-1 bg-slate-800/50 px-2 py-1 rounded border border-slate-700">
+                <span className="material-symbols-outlined text-xs">calendar_today</span> {activeFilter}
+              </span>
+              {selectedBrand !== 'grupo trigo' && (
+                <span className="flex items-center gap-1 bg-primary/20 text-primary px-2 py-1 rounded border border-primary/20 font-bold capitalize">
+                  <span className="material-symbols-outlined text-xs">branding_watermark</span> {selectedBrand}
+                </span>
               )}
               {drillDown.value && (
-                <span className="bg-accent-cyan/20 text-accent-cyan px-2 py-0.5 rounded font-medium">Filtro: {drillDown.value}</span>
+                <span className="flex items-center gap-1 bg-accent-cyan/20 text-accent-cyan px-2 py-1 rounded border border-accent-cyan/20 font-bold">
+                  <span className="material-symbols-outlined text-xs">filter_list</span> {drillDown.value}
+                </span>
               )}
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            {(drillDown.value || selectedBrand !== 'Grupo Trigo' || activeFilter !== 'Este Mês') && (
+          <div className="flex items-center gap-4">
+            {(drillDown.value || selectedBrand !== 'grupo trigo' || activeFilter !== 'Últimos 7 Dias') && (
               <button 
                 onClick={clearAllFilters}
-                className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 transition-colors uppercase tracking-widest bg-red-400/10 px-3 py-1.5 rounded-lg border border-red-400/20"
+                className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 transition-all uppercase tracking-widest bg-red-400/10 px-4 py-2 rounded-lg border border-red-400/20 active:scale-95"
               >
                 <span className="material-symbols-outlined text-sm">filter_alt_off</span>
                 Limpar Filtros
               </button>
             )}
-            <div className="text-right hidden sm:block">
-              <p className="text-xs text-secondary-text uppercase tracking-widest font-bold">Última atualização</p>
+            <div className="text-right hidden sm:block border-l border-slate-800 pl-4">
+              <p className="text-[10px] text-secondary-text uppercase tracking-widest font-black">Sincronizado em</p>
               <p className="text-sm font-bold text-accent-cyan">{new Date().toLocaleTimeString()}</p>
             </div>
           </div>
         </div>
 
         <StatsGrid 
-          stats={stats} 
+          stats={statsForGrid} 
           selectedBrand={selectedBrand} 
           onBrandClick={handleBrandClick}
         />
 
-        {stats.totalTickets === 0 ? (
-          <div className="bg-surface-dark p-12 rounded-xl border border-slate-800 text-center my-8">
-            <span className="material-symbols-outlined text-slate-600 text-6xl mb-4">query_stats</span>
-            <h3 className="text-xl font-bold text-slate-400">Nenhum dado encontrado com esses filtros</h3>
+        {statsForCharts.totalTickets === 0 ? (
+          <div className="bg-surface-dark p-20 rounded-2xl border border-dashed border-slate-800 text-center my-8">
+            <div className="size-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
+               <span className="material-symbols-outlined text-slate-500 text-4xl">inventory_2</span>
+            </div>
+            <h3 className="text-xl font-bold text-slate-400">Nenhum acionamento encontrado</h3>
+            <p className="text-slate-500 text-sm mt-1 max-w-md mx-auto">Tente ajustar o filtro de tempo ou selecionar outra marca para visualizar os dados.</p>
             <button 
               onClick={clearAllFilters}
-              className="text-primary hover:underline mt-2 text-sm font-bold"
+              className="text-primary hover:text-accent-cyan mt-6 text-sm font-bold flex items-center gap-2 mx-auto transition-colors"
             >
-              Resetar todos os filtros
+              Resetar todos os filtros <span className="material-symbols-outlined text-sm">refresh</span>
             </button>
           </div>
         ) : (
-          <>
+          <div className="animate-in fade-in duration-500">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               <SystemDistribution 
-                stats={stats} 
+                stats={statsForCharts} 
                 onDrillDown={handleDrillDown} 
                 activeDrill={drillDown}
               />
               <TopReasons 
-                stats={stats} 
+                stats={statsForCharts} 
                 onDrillDown={handleDrillDown} 
                 activeDrill={drillDown}
               />
@@ -225,22 +229,22 @@ const App: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <TopStores 
-                stats={stats} 
+                stats={statsForCharts} 
                 onDrillDown={handleDrillDown} 
                 activeDrill={drillDown}
               />
               <PeriodDistribution 
-                stats={stats} 
+                stats={statsForCharts} 
                 onDrillDown={handleDrillDown} 
                 activeDrill={drillDown}
               />
             </div>
-          </>
+          </div>
         )}
       </main>
 
-      <footer className="p-8 text-center text-slate-600 text-xs font-medium border-t border-slate-800 mt-8">
-        &copy; {new Date().getFullYear()} Controle de Acionamentos SAF Arcanjos. Dados via Google Sheets API.
+      <footer className="p-8 text-center text-slate-600 text-[10px] font-black uppercase tracking-[0.2em] border-t border-slate-800 mt-12">
+        &copy; {new Date().getFullYear()} SAF Arcanjos &bull; Inteligência de Negócios &bull; v2.1
       </footer>
     </div>
   );
