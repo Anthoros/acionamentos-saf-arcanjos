@@ -7,7 +7,7 @@ interface ChartProps {
   stats: DashboardStats;
   tickets: TicketData[];
   onDrillDown: (type: string, value: string) => void;
-  activeDrill: { type: string | null; value: string | null };
+  activeFilters: Record<string, string>;
 }
 
 export const SYSTEM_COLORS: Record<string, string> = {
@@ -56,7 +56,7 @@ const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value, 
   );
 };
 
-export const SystemDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, activeDrill }) => {
+export const SystemDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, activeFilters }) => {
   const data = (Object.entries(stats.systemCounts) as [string, number][])
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
@@ -68,8 +68,8 @@ export const SystemDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
       <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
         <span className="material-symbols-outlined text-primary">donut_large</span>
         Distribuição por Sistema
-        {activeDrill.type === 'sistema' && (
-          <span className="ml-auto text-[10px] bg-primary/20 text-primary px-2 py-1 rounded">Filtro: {activeDrill.value}</span>
+        {activeFilters.sistema && (
+          <span className="ml-auto text-[10px] bg-primary/20 text-primary px-2 py-1 rounded">Filtro: {activeFilters.sistema}</span>
         )}
       </h3>
       <div className="flex-1 w-full min-h-0">
@@ -91,9 +91,9 @@ export const SystemDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
                 <Cell 
                   key={`cell-${index}`} 
                   fill={SYSTEM_COLORS[entry.name] || '#475569'}
-                  strokeWidth={activeDrill.value === entry.name ? 4 : 0}
+                  strokeWidth={activeFilters.sistema === entry.name ? 4 : 0}
                   stroke="#fff"
-                  opacity={activeDrill.type === 'sistema' && activeDrill.value !== entry.name ? 0.3 : 1}
+                  opacity={activeFilters.sistema && activeFilters.sistema !== entry.name ? 0.3 : 1}
                 />
               ))}
             </Pie>
@@ -115,8 +115,8 @@ export const SystemDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
   );
 };
 
-export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeDrill }) => {
-  const isDetailMode = activeDrill.type === 'categoria';
+export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeFilters }) => {
+  const isDetailMode = !!activeFilters.categoria;
   const dataSource = isDetailMode ? stats.detailCounts : stats.reasonCounts;
 
   const sortedReasons = (Object.entries(dataSource) as [string, number][])
@@ -132,11 +132,11 @@ export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeDri
           {isDetailMode ? 'manage_search' : 'bar_chart'}
         </span>
         <span className="truncate">
-          {isDetailMode ? `Detalhes: ${activeDrill.value}` : 'Principais Motivos'}
+          {isDetailMode ? `Detalhes: ${activeFilters.categoria}` : 'Principais Motivos'}
         </span>
         {isDetailMode && (
           <button 
-            onClick={() => onDrillDown('categoria', activeDrill.value!)}
+            onClick={() => onDrillDown('categoria', activeFilters.categoria)}
             className="ml-auto text-[10px] bg-slate-700 hover:bg-primary text-white px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all shrink-0 font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-black/20"
           >
             <span className="material-symbols-outlined text-[14px]">arrow_back</span>
@@ -153,7 +153,7 @@ export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeDri
             disabled={isDetailMode}
           >
             <div className="flex justify-between text-[10px] mb-1 uppercase font-black tracking-tight">
-              <span className={`truncate pr-4 max-w-[85%] transition-colors ${activeDrill.value === name && !isDetailMode ? 'text-accent-cyan' : 'text-slate-400 group-hover:text-slate-100'}`}>
+              <span className={`truncate pr-4 max-w-[85%] transition-colors ${activeFilters.categoria === name && !isDetailMode ? 'text-accent-cyan' : 'text-slate-400 group-hover:text-slate-100'}`}>
                 {name}
                 {!isDetailMode && stats.categorySystems[name] && (
                   <span className="ml-1 opacity-90 italic font-normal text-[9px]">
@@ -191,8 +191,8 @@ export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeDri
   );
 };
 
-export const TopStores: React.FC<ChartProps> = ({ stats, tickets, onDrillDown, activeDrill }) => {
-  const isStoreMode = activeDrill.type === 'unidade';
+export const TopStores: React.FC<ChartProps> = ({ stats, tickets, onDrillDown, activeFilters }) => {
+  const isStoreMode = !!activeFilters.unidade;
 
   const parseDateTime = (d: string, t?: string) => {
     const parts = d.split(/[-/]/);
@@ -219,11 +219,11 @@ export const TopStores: React.FC<ChartProps> = ({ stats, tickets, onDrillDown, a
           {isStoreMode ? 'history' : 'store'}
         </span>
         <span className="truncate">
-          {isStoreMode ? `Últimos Chamados: ${activeDrill.value}` : 'Unidades com maior volume'}
+          {isStoreMode ? `Últimos Chamados: ${activeFilters.unidade}` : 'Unidades com maior volume'}
         </span>
         {isStoreMode && (
           <button 
-            onClick={() => onDrillDown('unidade', activeDrill.value!)}
+            onClick={() => onDrillDown('unidade', activeFilters.unidade)}
             className="ml-auto text-[10px] bg-slate-700 hover:bg-primary text-white px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all shrink-0 font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-black/20"
           >
             <span className="material-symbols-outlined text-[14px]">arrow_back</span>
@@ -267,14 +267,14 @@ export const TopStores: React.FC<ChartProps> = ({ stats, tickets, onDrillDown, a
               key={idx} 
               onClick={() => onDrillDown('unidade', name)}
               className={`flex items-center justify-between p-3 rounded-lg border transition-all group active:scale-[0.98] ${
-                activeDrill.value === name ? 'bg-primary/20 border-primary shadow-lg shadow-primary/10' : 'bg-slate-800/40 border-slate-700/30 hover:bg-card-dark'
+                activeFilters.unidade === name ? 'bg-primary/20 border-primary shadow-lg shadow-primary/10' : 'bg-slate-800/40 border-slate-700/30 hover:bg-card-dark'
               }`}
             >
               <div className="flex items-center gap-3">
-                <span className={`flex items-center justify-center size-6 rounded-full ${idx === 0 || activeDrill.value === name ? 'bg-primary text-white shadow-md shadow-primary/20' : 'bg-slate-700/50 text-slate-400'} font-black text-[10px]`}>
+                <span className={`flex items-center justify-center size-6 rounded-full ${idx === 0 || activeFilters.unidade === name ? 'bg-primary text-white shadow-md shadow-primary/20' : 'bg-slate-700/50 text-slate-400'} font-black text-[10px]`}>
                   {idx + 1}
                 </span>
-                <p className={`text-[11px] font-bold uppercase truncate transition-colors ${activeDrill.value === name ? 'text-primary' : 'text-slate-200 group-hover:text-accent-cyan'}`}>{name}</p>
+                <p className={`text-[11px] font-bold uppercase truncate transition-colors ${activeFilters.unidade === name ? 'text-primary' : 'text-slate-200 group-hover:text-accent-cyan'}`}>{name}</p>
               </div>
               <div className="text-right">
                 <p className="text-sm font-black text-white">{count}</p>
@@ -287,7 +287,7 @@ export const TopStores: React.FC<ChartProps> = ({ stats, tickets, onDrillDown, a
   );
 };
 
-export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, activeDrill }) => {
+export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, activeFilters }) => {
   const periodColors: Record<string, string> = {
     'Manhã': '#38bdf8',
     'Tarde': '#f97316',
@@ -310,6 +310,9 @@ export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
       <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
         <span className="material-symbols-outlined text-primary">schedule</span>
         Volume por Período
+        {activeFilters.turno && (
+          <span className="ml-auto text-[10px] bg-primary/20 text-primary px-2 py-1 rounded">Filtro: {activeFilters.turno}</span>
+        )}
       </h3>
       <div className="flex-1 w-full min-h-0">
         <ResponsiveContainer width="100%" height="100%">
@@ -330,9 +333,9 @@ export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
                 <Cell 
                   key={`cell-${index}`} 
                   fill={entry.color}
-                  strokeWidth={activeDrill.value === entry.name ? 4 : 0}
+                  strokeWidth={activeFilters.turno === entry.name ? 4 : 0}
                   stroke="#fff"
-                  opacity={activeDrill.type === 'turno' && activeDrill.value !== entry.name ? 0.3 : 1}
+                  opacity={activeFilters.turno && activeFilters.turno !== entry.name ? 0.3 : 1}
                 />
               ))}
             </Pie>

@@ -18,10 +18,7 @@ const App: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState('Últimos 7 dias');
   const [selectedBrand, setSelectedBrand] = useState('grupo trigo'); // Store the key
   const [lastDataUpdate, setLastDataUpdate] = useState<string>('');
-  const [drillDown, setDrillDown] = useState<{ type: string | null; value: string | null }>({
-    type: null,
-    value: null
-  });
+  const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const loadData = async () => {
@@ -47,116 +44,98 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Filter stage 1: Time filter only (The baseline for everything)
-  const timeFilteredData = useMemo(() => {
-    if (rawData.length === 0) return [];
+  const filteredData = useMemo(() => {
+    if (rawData.length === 0) return { drillDownData: [], finalData: [] };
 
     const agora = new Date();
     const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
 
-    return rawData.filter(item => {
+    // 1. Time Filter (Base)
+    const timeData = rawData.filter(item => {
       if (!item.data_abertura) return false;
-      
       const parts = item.data_abertura.split(/[-/]/).map(Number);
       if (parts.length < 3) return false;
-      
       const [dia, mes, ano] = parts;
       const dataTicket = new Date(ano, mes - 1, dia);
 
-      let timePass = false;
-
       switch (activeFilter) {
-        case 'Hoje':
-          timePass = dataTicket.getTime() === hoje.getTime();
-          break;
-        case 'Ontem':
+        case 'Hoje': return dataTicket.getTime() === hoje.getTime();
+        case 'Ontem': {
           const ontem = new Date(hoje);
           ontem.setDate(hoje.getDate() - 1);
-          timePass = dataTicket.getTime() === ontem.getTime();
-          break;
-        case 'Últimos 7 dias':
+          return dataTicket.getTime() === ontem.getTime();
+        }
+        case 'Últimos 7 dias': {
           const seteDias = new Date(hoje);
           seteDias.setDate(hoje.getDate() - 7);
-          timePass = dataTicket >= seteDias && dataTicket <= hoje;
-          break;
-        case 'Últimos 30 dias':
+          return dataTicket >= seteDias && dataTicket <= hoje;
+        }
+        case 'Últimos 30 dias': {
           const trintaDias = new Date(hoje);
           trintaDias.setDate(hoje.getDate() - 30);
-          timePass = dataTicket >= trintaDias && dataTicket <= hoje;
-          break;
-        case 'Últimos 90 dias':
+          return dataTicket >= trintaDias && dataTicket <= hoje;
+        }
+        case 'Últimos 90 dias': {
           const noventaDias = new Date(hoje);
           noventaDias.setDate(hoje.getDate() - 90);
-          timePass = dataTicket >= noventaDias && dataTicket <= hoje;
-          break;
-        case 'Últimos 12 meses':
+          return dataTicket >= noventaDias && dataTicket <= hoje;
+        }
+        case 'Últimos 12 meses': {
           const umAnoAtras = new Date(hoje);
           umAnoAtras.setFullYear(hoje.getFullYear() - 1);
-          timePass = dataTicket >= umAnoAtras && dataTicket <= hoje;
-          break;
-        case 'Esta semana':
-          // Finding first day of current week (Sunday)
+          return dataTicket >= umAnoAtras && dataTicket <= hoje;
+        }
+        case 'Esta semana': {
           const primeiroDiaSemana = new Date(hoje);
           primeiroDiaSemana.setDate(hoje.getDate() - hoje.getDay());
-          timePass = dataTicket >= primeiroDiaSemana && dataTicket <= hoje;
-          break;
-        case 'Este mês':
-          timePass = dataTicket.getMonth() === hoje.getMonth() && 
-                     dataTicket.getFullYear() === hoje.getFullYear();
-          break;
-        case 'Mês anterior':
+          return dataTicket >= primeiroDiaSemana && dataTicket <= hoje;
+        }
+        case 'Este mês': return dataTicket.getMonth() === hoje.getMonth() && dataTicket.getFullYear() === hoje.getFullYear();
+        case 'Mês anterior': {
           const mesAnterior = hoje.getMonth() === 0 ? 11 : hoje.getMonth() - 1;
           const anoDoMesAnterior = hoje.getMonth() === 0 ? hoje.getFullYear() - 1 : hoje.getFullYear();
-          timePass = dataTicket.getMonth() === mesAnterior && 
-                     dataTicket.getFullYear() === anoDoMesAnterior;
-          break;
-        case 'Este ano':
-          timePass = dataTicket.getFullYear() === hoje.getFullYear();
-          break;
-        case 'Ano anterior':
-          timePass = dataTicket.getFullYear() === hoje.getFullYear() - 1;
-          break;
-        default:
-          timePass = true;
-      }
-      return timePass;
-    });
-  }, [rawData, activeFilter]);
-
-  // Filter stage 2: Drilldown (Search/Unit/System)
-  const drillDownFilteredData = useMemo(() => {
-    let data = [...timeFilteredData];
-
-    if (drillDown.type && drillDown.value) {
-      const type = drillDown.type;
-      const val = drillDown.value;
-      data = data.filter(item => {
-        if (type === 'sistema') {
-          return (item.sistema?.toUpperCase() || '').includes(val.toUpperCase());
+          return dataTicket.getMonth() === mesAnterior && dataTicket.getFullYear() === anoDoMesAnterior;
         }
+        case 'Este ano': return dataTicket.getFullYear() === hoje.getFullYear();
+        case 'Ano anterior': return dataTicket.getFullYear() === hoje.getFullYear() - 1;
+        default: return true;
+      }
+    });
+
+    // 2. Brand Filter
+    const brandData = timeData.filter(item => {
+      if (selectedBrand === 'grupo trigo') return true;
+      return (item.marca?.toLowerCase() || '').includes(selectedBrand.toLowerCase());
+    });
+
+    // 3. Stackable Drilldown (excluding category for the 'reasons' chart base comparison)
+    const drillDownData = brandData.filter(item => {
+      return Object.entries(activeFilters).every(([type, value]) => {
+        if (type === 'categoria') return true; // Don't filter category here for reasons chart
         const key = type as keyof TicketData;
-        return item[key] === val;
+        // Fix: Cast value to string explicitly to avoid 'unknown' type errors when using toUpperCase
+        const valStr = String(value);
+        if (type === 'sistema') return (item.sistema?.toUpperCase() || '').includes(valStr.toUpperCase());
+        return item[key] === value;
       });
-    }
+    });
 
-    return data;
-  }, [timeFilteredData, drillDown]);
+    // 4. Final Data (including category filter for everything else)
+    const finalData = drillDownData.filter(item => {
+      if (activeFilters.categoria) {
+        return item.categoria === activeFilters.categoria;
+      }
+      return true;
+    });
 
-  // Filter stage 3: Brand selection
-  const finalFilteredData = useMemo(() => {
-    let data = [...drillDownFilteredData];
+    return { drillDownData, finalData };
+  }, [rawData, activeFilter, selectedBrand, activeFilters]);
 
-    if (selectedBrand !== 'grupo trigo') {
-      data = data.filter(item => 
-        (item.marca?.toLowerCase() || '').includes(selectedBrand.toLowerCase())
-      );
-    }
-
-    return data;
-  }, [drillDownFilteredData, selectedBrand]);
-
-  const statsForGrid = useMemo(() => calculateStats(drillDownFilteredData), [drillDownFilteredData]);
-  const statsForCharts = useMemo(() => calculateStats(finalFilteredData), [finalFilteredData]);
+  // statsForReasons uses drillDownData so the user can see other categories for comparison
+  const statsForReasons = useMemo(() => calculateStats(filteredData.drillDownData), [filteredData.drillDownData]);
+  // statsForCharts and statsForGrid use finalData which is strictly filtered
+  const statsForGrid = useMemo(() => calculateStats(filteredData.finalData), [filteredData.finalData]);
+  const statsForCharts = useMemo(() => calculateStats(filteredData.finalData), [filteredData.finalData]);
 
   const allUniqueStores = useMemo(() => {
     const stores = rawData.map(item => item.unidade).filter(Boolean);
@@ -164,11 +143,15 @@ const App: React.FC = () => {
   }, [rawData]);
 
   const handleDrillDown = (type: string, value: string) => {
-    if (drillDown.type === type && drillDown.value === value) {
-      setDrillDown({ type: null, value: null });
-    } else {
-      setDrillDown({ type, value });
-    }
+    setActiveFilters(prev => {
+      const newFilters = { ...prev };
+      if (newFilters[type] === value) {
+        delete newFilters[type];
+      } else {
+        newFilters[type] = value;
+      }
+      return newFilters;
+    });
   };
 
   const handleBrandClick = (brandKey: string) => {
@@ -176,13 +159,21 @@ const App: React.FC = () => {
   };
 
   const handleStoreSelect = (store: string) => {
-    setDrillDown({ type: 'unidade', value: store });
+    handleDrillDown('unidade', store);
   };
 
   const clearAllFilters = () => {
-    setDrillDown({ type: null, value: null });
+    setActiveFilters({});
     setSelectedBrand('grupo trigo');
     setActiveFilter('Últimos 7 dias');
+  };
+
+  const removeFilter = (key: string) => {
+    setActiveFilters(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   };
 
   if (loading) {
@@ -215,20 +206,32 @@ const App: React.FC = () => {
                 <span className="material-symbols-outlined text-xs">calendar_today</span> {activeFilter}
               </span>
               {selectedBrand !== 'grupo trigo' && (
-                <span className="flex items-center gap-1 bg-primary/20 text-primary px-2 py-1 rounded border border-primary/20 font-bold capitalize">
+                <button 
+                  onClick={() => setSelectedBrand('grupo trigo')}
+                  className="flex items-center gap-1 bg-primary/20 text-primary px-2 py-1 rounded border border-primary/20 font-bold capitalize hover:bg-primary/30 transition-colors"
+                >
                   <span className="material-symbols-outlined text-xs">branding_watermark</span> {selectedBrand}
-                </span>
+                  <span className="material-symbols-outlined text-xs">close</span>
+                </button>
               )}
-              {drillDown.value && (
-                <span className="flex items-center gap-1 bg-accent-cyan/20 text-accent-cyan px-2 py-1 rounded border border-accent-cyan/20 font-bold">
-                  <span className="material-symbols-outlined text-xs">filter_list</span> {drillDown.value}
-                </span>
-              )}
+              {Object.entries(activeFilters).map(([key, value]) => (
+                <button 
+                  key={key}
+                  onClick={() => removeFilter(key)}
+                  className="flex items-center gap-1 bg-accent-cyan/20 text-accent-cyan px-2 py-1 rounded border border-accent-cyan/20 font-bold hover:bg-accent-cyan/30 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-xs">
+                    {key === 'unidade' ? 'store' : key === 'sistema' ? 'computer' : 'filter_list'}
+                  </span> 
+                  {value}
+                  <span className="material-symbols-outlined text-xs">close</span>
+                </button>
+              ))}
             </div>
           </div>
           
           <div className="flex items-center gap-4">
-            {(drillDown.value || selectedBrand !== 'grupo trigo' || activeFilter !== 'Últimos 7 dias') && (
+            {(Object.keys(activeFilters).length > 0 || selectedBrand !== 'grupo trigo' || activeFilter !== 'Últimos 7 dias') && (
               <button 
                 onClick={clearAllFilters}
                 className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 transition-all uppercase tracking-widest bg-red-400/10 px-4 py-2 rounded-lg border border-red-400/20 active:scale-95"
@@ -250,7 +253,7 @@ const App: React.FC = () => {
           onBrandClick={handleBrandClick}
         />
 
-        {statsForCharts.totalTickets === 0 ? (
+        {statsForGrid.totalTickets === 0 ? (
           <div className="bg-surface-dark p-20 rounded-2xl border border-dashed border-slate-800 text-center my-8">
             <div className="size-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
                <span className="material-symbols-outlined text-slate-500 text-4xl">inventory_2</span>
@@ -269,30 +272,30 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               <SystemDistribution 
                 stats={statsForCharts} 
-                tickets={finalFilteredData}
+                tickets={filteredData.finalData}
                 onDrillDown={handleDrillDown} 
-                activeDrill={drillDown}
+                activeFilters={activeFilters}
               />
               <TopReasons 
-                stats={statsForCharts} 
-                tickets={finalFilteredData}
+                stats={statsForReasons} 
+                tickets={filteredData.drillDownData}
                 onDrillDown={handleDrillDown} 
-                activeDrill={drillDown}
+                activeFilters={activeFilters}
               />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <TopStores 
                 stats={statsForCharts} 
-                tickets={finalFilteredData}
+                tickets={filteredData.finalData}
                 onDrillDown={handleDrillDown} 
-                activeDrill={drillDown}
+                activeFilters={activeFilters}
               />
               <PeriodDistribution 
                 stats={statsForCharts} 
-                tickets={finalFilteredData}
+                tickets={filteredData.finalData}
                 onDrillDown={handleDrillDown} 
-                activeDrill={drillDown}
+                activeFilters={activeFilters}
               />
             </div>
           </div>
