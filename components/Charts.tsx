@@ -111,6 +111,16 @@ export const SystemDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
               align="center" 
               wrapperStyle={{ paddingTop: '20px', cursor: 'pointer' }} 
               onClick={(e) => onDrillDown('sistema', e.value)}
+              formatter={(value) => (
+                <span className="text-slate-300 font-medium">
+                  {value} 
+                  {activeFilters.categoria && (
+                    <span className="ml-1 text-accent-cyan opacity-70 italic text-[10px]">
+                      ({activeFilters.categoria})
+                    </span>
+                  )}
+                </span>
+              )}
             />
           </PieChart>
         </ResponsiveContainer>

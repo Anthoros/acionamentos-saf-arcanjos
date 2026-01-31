@@ -170,6 +170,11 @@ const App: React.FC = () => {
       const newFilters = { ...prev };
       if (newFilters[type] === value) {
         delete newFilters[type];
+        
+        // CASCADING RULE: If we remove 'sistema', we also clear 'categoria'
+        if (type === 'sistema') {
+          delete newFilters['categoria'];
+        }
       } else {
         newFilters[type] = value;
       }
@@ -195,6 +200,10 @@ const App: React.FC = () => {
     setActiveFilters(prev => {
       const next = { ...prev };
       delete next[key];
+      // Cascading clear for system -> category here too
+      if (key === 'sistema') {
+        delete next['categoria'];
+      }
       return next;
     });
   };
