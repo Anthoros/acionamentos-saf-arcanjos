@@ -29,7 +29,6 @@ const App: React.FC = () => {
           setError("Nenhum dado encontrado na planilha.");
         } else {
           setRawData(data);
-          // Calculate the timestamp of the last record in the sheet
           setLastDataUpdate(getLastUpdateInfo(data));
         }
       } catch (err) {
@@ -45,7 +44,7 @@ const App: React.FC = () => {
   }, []);
 
   const filteredData = useMemo(() => {
-    if (rawData.length === 0) return { drillDownData: [], finalData: [] };
+    if (rawData.length === 0) return { gridData: [], finalData: [] };
 
     const agora = new Date();
     const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
@@ -102,39 +101,38 @@ const App: React.FC = () => {
       }
     });
 
-    // 2. Brand Filter
-    const brandData = timeData.filter(item => {
-      if (selectedBrand === 'grupo trigo') return true;
-      return (item.marca?.toLowerCase() || '').includes(selectedBrand.toLowerCase());
-    });
-
-    // 3. Stackable Drilldown (excluding category for the 'reasons' chart base comparison)
-    const drillDownData = brandData.filter(item => {
+    // 2. Grid Data (For top cards)
+    // Filters by active drill-downs (Unit, System) but ignores selected brand and category
+    const gridData = timeData.filter(item => {
       return Object.entries(activeFilters).every(([type, value]) => {
-        if (type === 'categoria') return true; // Don't filter category here for reasons chart
+        if (type === 'categoria') return true; 
         const key = type as keyof TicketData;
-        // Fix: Cast value to string explicitly to avoid 'unknown' type errors when using toUpperCase
         const valStr = String(value);
         if (type === 'sistema') return (item.sistema?.toUpperCase() || '').includes(valStr.toUpperCase());
         return item[key] === value;
       });
     });
 
-    // 4. Final Data (including category filter for everything else)
-    const finalData = drillDownData.filter(item => {
+    // 3. Final Data (For charts)
+    // Inherits grid filters and adds selected brand and category filters
+    const finalData = gridData.filter(item => {
+      // Brand filter (from StatsGrid selection)
+      if (selectedBrand !== 'grupo trigo') {
+        if (!(item.marca?.toLowerCase() || '').includes(selectedBrand.toLowerCase())) return false;
+      }
+      // Category filter (from drill-down chart)
       if (activeFilters.categoria) {
-        return item.categoria === activeFilters.categoria;
+        if (item.categoria !== activeFilters.categoria) return false;
       }
       return true;
     });
 
-    return { drillDownData, finalData };
+    return { gridData, finalData };
   }, [rawData, activeFilter, selectedBrand, activeFilters]);
 
-  // statsForReasons uses drillDownData so the user can see other categories for comparison
-  const statsForReasons = useMemo(() => calculateStats(filteredData.drillDownData), [filteredData.drillDownData]);
-  // statsForCharts and statsForGrid use finalData which is strictly filtered
-  const statsForGrid = useMemo(() => calculateStats(filteredData.finalData), [filteredData.finalData]);
+  // statsForGrid uses data NOT filtered by brand, so brand cards always show distribution
+  const statsForGrid = useMemo(() => calculateStats(filteredData.gridData), [filteredData.gridData]);
+  // statsForCharts uses final data (filtered by brand and potentially category)
   const statsForCharts = useMemo(() => calculateStats(filteredData.finalData), [filteredData.finalData]);
 
   const allUniqueStores = useMemo(() => {
@@ -277,8 +275,8 @@ const App: React.FC = () => {
                 activeFilters={activeFilters}
               />
               <TopReasons 
-                stats={statsForReasons} 
-                tickets={filteredData.drillDownData}
+                stats={statsForCharts} 
+                tickets={filteredData.finalData}
                 onDrillDown={handleDrillDown} 
                 activeFilters={activeFilters}
               />
