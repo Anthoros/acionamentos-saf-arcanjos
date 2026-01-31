@@ -1,38 +1,71 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchData, calculateStats, getLastUpdateInfo } from './services/dataService';
-import { TicketData, DashboardStats } from './types';
-import Header from './components/Header';
-import StatsGrid from './components/StatsGrid';
+import { fetchData, calculateStats, getLastUpdateInfo } from './services/dataService.ts';
+import { TicketData, DashboardStats } from './types.ts';
+import Header from './components/Header.tsx';
+import StatsGrid from './components/StatsGrid.tsx';
 import { 
   SystemDistribution, 
   TopReasons, 
   TopStores, 
   PeriodDistribution 
-} from './components/Charts';
+} from './components/Charts.tsx';
 
 const App: React.FC = () => {
   const [rawData, setRawData] = useState<TicketData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState('Últimos 7 dias');
-  const [selectedBrand, setSelectedBrand] = useState('grupo trigo'); // Store the key
+  const [selectedBrand, setSelectedBrand] = useState('grupo trigo');
   const [lastDataUpdate, setLastDataUpdate] = useState<string>('');
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
 
+  // 1. Initialize filters from URL on mount
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      
+      const brandParam = params.get('marca');
+      if (brandParam) setSelectedBrand(brandParam.toLowerCase());
+      
+      const periodParam = params.get('periodo');
+      if (periodParam) setActiveFilter(periodParam);
+      
+      const newActiveFilters: Record<string, string> = {};
+      const loja = params.get('loja');
+      const motivo = params.get('motivo');
+      const sistema = params.get('sistema');
+      const turno = params.get('turno');
+      
+      if (loja) newActiveFilters.unidade = loja;
+      if (motivo) newActiveFilters.categoria = motivo;
+      if (sistema) newActiveFilters.sistema = sistema;
+      if (turno) newActiveFilters.turno = turno;
+      
+      if (Object.keys(newActiveFilters).length > 0) {
+        setActiveFilters(newActiveFilters);
+      }
+    } catch (e) {
+      console.error("Failed to parse URL parameters", e);
+    }
+  }, []);
+
+  // 2. Load data from spreadsheet
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
         const data = await fetchData();
-        if (data.length === 0) {
-          setError("Nenhum dado encontrado na planilha.");
+        if (!data || data.length === 0) {
+          setError("Nenhum dado encontrado ou erro de conexão.");
         } else {
           setRawData(data);
           setLastDataUpdate(getLastUpdateInfo(data));
+          setError(null);
         }
       } catch (err) {
-        setError("Erro ao carregar os dados.");
+        console.error("Data load error", err);
+        setError("Erro ao carregar os dados. Verifique sua conexão.");
       } finally {
         setLoading(false);
       }
@@ -44,14 +77,13 @@ const App: React.FC = () => {
   }, []);
 
   const filteredData = useMemo(() => {
-    if (rawData.length === 0) return { gridData: [], finalData: [] };
+    if (!rawData || rawData.length === 0) return { gridData: [], finalData: [] };
 
     const agora = new Date();
     const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
 
-    // 1. Time Filter (Base)
     const timeData = rawData.filter(item => {
-      if (!item.data_abertura) return false;
+      if (!item || !item.data_abertura) return false;
       const parts = item.data_abertura.split(/[-/]/).map(Number);
       if (parts.length < 3) return false;
       const [dia, mes, ano] = parts;
@@ -101,8 +133,6 @@ const App: React.FC = () => {
       }
     });
 
-    // 2. Grid Data (For top cards)
-    // Filters by active drill-downs (Unit, System) but ignores selected brand and category
     const gridData = timeData.filter(item => {
       return Object.entries(activeFilters).every(([type, value]) => {
         if (type === 'categoria') return true; 
@@ -113,14 +143,10 @@ const App: React.FC = () => {
       });
     });
 
-    // 3. Final Data (For charts)
-    // Inherits grid filters and adds selected brand and category filters
     const finalData = gridData.filter(item => {
-      // Brand filter (from StatsGrid selection)
-      if (selectedBrand !== 'grupo trigo') {
+      if (selectedBrand && selectedBrand !== 'grupo trigo') {
         if (!(item.marca?.toLowerCase() || '').includes(selectedBrand.toLowerCase())) return false;
       }
-      // Category filter (from drill-down chart)
       if (activeFilters.categoria) {
         if (item.categoria !== activeFilters.categoria) return false;
       }
@@ -130,12 +156,11 @@ const App: React.FC = () => {
     return { gridData, finalData };
   }, [rawData, activeFilter, selectedBrand, activeFilters]);
 
-  // statsForGrid uses data NOT filtered by brand, so brand cards always show distribution
   const statsForGrid = useMemo(() => calculateStats(filteredData.gridData), [filteredData.gridData]);
-  // statsForCharts uses final data (filtered by brand and potentially category)
   const statsForCharts = useMemo(() => calculateStats(filteredData.finalData), [filteredData.finalData]);
 
   const allUniqueStores = useMemo(() => {
+    if (!rawData) return [];
     const stores = rawData.map(item => item.unidade).filter(Boolean);
     return Array.from(new Set(stores)).sort();
   }, [rawData]);
@@ -153,7 +178,7 @@ const App: React.FC = () => {
   };
 
   const handleBrandClick = (brandKey: string) => {
-    setSelectedBrand(brandKey);
+    setSelectedBrand(brandKey.toLowerCase());
   };
 
   const handleStoreSelect = (store: string) => {
@@ -183,10 +208,27 @@ const App: React.FC = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background-dark flex flex-col items-center justify-center text-white p-8 text-center">
+        <span className="material-symbols-outlined text-red-500 text-6xl mb-4">error</span>
+        <h2 className="text-2xl font-bold mb-2">{error}</h2>
+        <button 
+          onClick={() => window.location.reload()}
+          className="mt-6 bg-primary px-6 py-2 rounded-lg font-bold hover:bg-primary/80 transition-colors"
+        >
+          Tentar Novamente
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-background-dark text-slate-100 selection:bg-primary/30">
       <Header 
         activeFilter={activeFilter} 
+        selectedBrand={selectedBrand}
+        activeFilters={activeFilters}
         onFilterChange={setActiveFilter}
         allStores={allUniqueStores}
         onStoreSelect={handleStoreSelect}

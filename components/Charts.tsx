@@ -67,12 +67,19 @@ export const SystemDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
     <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm flex flex-col h-[550px]">
       <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
         <span className="material-symbols-outlined text-primary">donut_large</span>
-        Distribuição por Sistema
+        <span className="truncate">Distribuição por Sistema</span>
         {activeFilters.sistema && (
-          <span className="ml-auto text-[10px] bg-primary/20 text-primary px-2 py-1 rounded">Filtro: {activeFilters.sistema}</span>
+          <button 
+            onClick={() => onDrillDown('sistema', activeFilters.sistema)}
+            className="ml-auto flex items-center gap-1.5 text-[10px] bg-primary/20 hover:bg-primary/40 text-primary px-2.5 py-1 rounded-full border border-primary/30 transition-all group animate-in fade-in zoom-in-95 duration-200"
+            title="Clique para remover filtro"
+          >
+            <span className="font-black uppercase tracking-tighter">Filtro: {activeFilters.sistema}</span>
+            <span className="material-symbols-outlined text-[14px] font-bold group-hover:rotate-90 transition-transform">close</span>
+          </button>
         )}
       </h3>
-      <div className="flex-1 w-full min-h-0">
+      <div className="flex-1 w-full min-h-[300px] min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -91,9 +98,10 @@ export const SystemDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
                 <Cell 
                   key={`cell-${index}`} 
                   fill={SYSTEM_COLORS[entry.name] || '#475569'}
-                  strokeWidth={activeFilters.sistema === entry.name ? 4 : 0}
+                  strokeWidth={activeFilters.sistema === entry.name ? 3 : 0}
                   stroke="#fff"
                   opacity={activeFilters.sistema && activeFilters.sistema !== entry.name ? 0.3 : 1}
+                  className="transition-all duration-300"
                 />
               ))}
             </Pie>
@@ -137,10 +145,11 @@ export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeFil
         {isDetailMode && (
           <button 
             onClick={() => onDrillDown('categoria', activeFilters.categoria)}
-            className="ml-auto text-[10px] bg-slate-700 hover:bg-primary text-white px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all shrink-0 font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-black/20"
+            className="ml-auto flex items-center gap-1.5 text-[10px] bg-accent-cyan/20 hover:bg-accent-cyan/40 text-accent-cyan px-2.5 py-1.5 rounded-full border border-accent-cyan/30 transition-all group animate-in fade-in zoom-in-95 duration-200 shadow-lg shadow-black/20"
+            title="Remover filtro de categoria"
           >
-            <span className="material-symbols-outlined text-[14px]">arrow_back</span>
-            VOLTAR
+            <span className="font-black uppercase tracking-tighter">FILTRO ATIVO</span>
+            <span className="material-symbols-outlined text-[14px] font-bold group-hover:rotate-90 transition-transform">close</span>
           </button>
         )}
       </h3>
@@ -219,19 +228,20 @@ export const TopStores: React.FC<ChartProps> = ({ stats, tickets, onDrillDown, a
           {isStoreMode ? 'history' : 'store'}
         </span>
         <span className="truncate">
-          {isStoreMode ? `Últimos Chamados: ${activeFilters.unidade}` : 'Unidades com maior volume'}
+          {isStoreMode ? `Últimos Chamados` : 'Unidades com maior volume'}
         </span>
         {isStoreMode && (
           <button 
             onClick={() => onDrillDown('unidade', activeFilters.unidade)}
-            className="ml-auto text-[10px] bg-slate-700 hover:bg-primary text-white px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all shrink-0 font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-black/20"
+            className="ml-auto flex items-center gap-1.5 text-[10px] bg-primary/20 hover:bg-primary/40 text-primary px-2.5 py-1.5 rounded-full border border-primary/30 transition-all group animate-in fade-in zoom-in-95 duration-200"
+            title="Remover filtro de unidade"
           >
-            <span className="material-symbols-outlined text-[14px]">arrow_back</span>
-            VOLTAR
+            <span className="font-black uppercase tracking-tighter truncate max-w-[120px]">{activeFilters.unidade}</span>
+            <span className="material-symbols-outlined text-[14px] font-bold group-hover:rotate-90 transition-transform">close</span>
           </button>
         )}
       </h3>
-      <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar">
+      <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar min-h-[300px] min-w-0">
         {isStoreMode ? (
           recentTickets.length > 0 ? (
             recentTickets.map((t, idx) => (
@@ -309,12 +319,19 @@ export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
     <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm h-[550px] flex flex-col">
       <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
         <span className="material-symbols-outlined text-primary">schedule</span>
-        Volume por Período
+        <span className="truncate">Volume por Período</span>
         {activeFilters.turno && (
-          <span className="ml-auto text-[10px] bg-primary/20 text-primary px-2 py-1 rounded">Filtro: {activeFilters.turno}</span>
+          <button 
+            onClick={() => onDrillDown('turno', activeFilters.turno)}
+            className="ml-auto flex items-center gap-1.5 text-[10px] bg-primary/20 hover:bg-primary/40 text-primary px-2.5 py-1 rounded-full border border-primary/30 transition-all group animate-in fade-in zoom-in-95 duration-200"
+            title="Remover filtro de turno"
+          >
+            <span className="font-black uppercase tracking-tighter">Filtro: {activeFilters.turno}</span>
+            <span className="material-symbols-outlined text-[14px] font-bold group-hover:rotate-90 transition-transform">close</span>
+          </button>
         )}
       </h3>
-      <div className="flex-1 w-full min-h-0">
+      <div className="flex-1 w-full min-h-[300px] min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -333,9 +350,10 @@ export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
                 <Cell 
                   key={`cell-${index}`} 
                   fill={entry.color}
-                  strokeWidth={activeFilters.turno === entry.name ? 4 : 0}
+                  strokeWidth={activeFilters.turno === entry.name ? 3 : 0}
                   stroke="#fff"
                   opacity={activeFilters.turno && activeFilters.turno !== entry.name ? 0.3 : 1}
+                  className="transition-all duration-300"
                 />
               ))}
             </Pie>

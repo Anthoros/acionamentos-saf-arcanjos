@@ -3,14 +3,24 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 
 interface HeaderProps {
   activeFilter: string;
+  selectedBrand: string;
+  activeFilters: Record<string, string>;
   onFilterChange: (filter: string) => void;
   allStores: string[];
   onStoreSelect: (store: string) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ activeFilter, onFilterChange, allStores, onStoreSelect }) => {
+const Header: React.FC<HeaderProps> = ({ 
+  activeFilter, 
+  selectedBrand, 
+  activeFilters, 
+  onFilterChange, 
+  allStores, 
+  onStoreSelect 
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showResults, setShowResults] = useState(false);
+  const [copied, setCopied] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   const timeFilters = [
@@ -41,11 +51,59 @@ const Header: React.FC<HeaderProps> = ({ activeFilter, onFilterChange, allStores
   }, []);
 
   const filteredStores = useMemo(() => {
-    if (searchTerm.length < 2) return [];
+    if (!searchTerm || searchTerm.length < 2) return [];
     return allStores
-      .filter(s => s.toLowerCase().includes(searchTerm.toLowerCase()))
+      .filter(s => s && s.toLowerCase().includes(searchTerm.toLowerCase()))
       .slice(0, 8);
   }, [searchTerm, allStores]);
+
+  const handleShare = async () => {
+    try {
+      const params = new URLSearchParams();
+      params.set('marca', selectedBrand);
+      params.set('periodo', activeFilter);
+      if (activeFilters.unidade) params.set('loja', activeFilters.unidade);
+      if (activeFilters.categoria) params.set('motivo', activeFilters.categoria);
+      if (activeFilters.sistema) params.set('sistema', activeFilters.sistema);
+      if (activeFilters.turno) params.set('turno', activeFilters.turno);
+
+      const baseUrl = window.location.href.split('?')[0];
+      const shareUrl = `${baseUrl}?${params.toString()}`;
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        setCopied(true);
+      } else {
+        // Fallback for non-secure contexts
+        const textArea = document.createElement("textarea");
+        textArea.value = shareUrl;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        textArea.style.top = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const successful = document.execCommand('copy');
+        if (successful) setCopied(true);
+        document.body.removeChild(textArea);
+      }
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+    
+    if (copied) {
+        // We already set it above, so we just clear it after 2s
+    } else {
+        // If it was already true, we don't do anything special here as the effect handles timing
+    }
+  };
+
+  useEffect(() => {
+    if (copied) {
+      const timer = setTimeout(() => setCopied(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [copied]);
 
   return (
     <header className="flex flex-col md:flex-row items-center justify-between border-b border-solid border-slate-800 px-8 py-4 bg-background-dark sticky top-0 z-50 gap-4">
@@ -96,6 +154,15 @@ const Header: React.FC<HeaderProps> = ({ activeFilter, onFilterChange, allStores
             </div>
           )}
         </div>
+
+        {/* Share Button */}
+        <button 
+          onClick={handleShare}
+          className={`flex items-center gap-2 ${copied ? 'bg-green-600' : 'bg-green-700 hover:bg-green-800'} text-white px-4 py-2 rounded-lg transition-all shadow-lg font-bold text-[10px] uppercase tracking-widest shrink-0 border border-white/10 active:scale-95`}
+        >
+          <span className="material-symbols-outlined text-sm">{copied ? 'check' : 'share'}</span>
+          <span className="hidden sm:inline">{copied ? 'Copiado!' : 'Compartilhar'}</span>
+        </button>
 
         {/* Time Selector */}
         <div className="relative group shrink-0">

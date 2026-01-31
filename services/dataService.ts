@@ -1,5 +1,5 @@
 
-import { TicketData, DashboardStats } from '../types';
+import { TicketData, DashboardStats } from '../types.ts';
 
 const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSgDdiQWX1AhvT_MdzZ2EYpVKi_EmwKdW6tRRfbaR0JTEUmIIGPgO3DL_f3una601MrZMPOQYI8qWJw/pub?gid=252607289&single=true&output=csv';
 
@@ -9,7 +9,11 @@ export const fetchData = async (): Promise<TicketData[]> => {
     if (!response.ok) throw new Error('Failed to fetch CSV data');
     const csvText = await response.text();
     
-    const lines = csvText.split('\n');
+    if (!csvText || csvText.trim().length === 0) return [];
+
+    const lines = csvText.split('\n').filter(line => line.trim().length > 0);
+    if (lines.length === 0) return [];
+
     // Normalize headers by removing quotes and trimming
     const headers = lines[0].replace(/"/g, '').split(',').map(h => h.trim().toLowerCase());
     
@@ -18,7 +22,7 @@ export const fetchData = async (): Promise<TicketData[]> => {
       const values = line.replace(/\r$/, '').split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
       const obj: any = {};
       headers.forEach((header, index) => {
-        const val = values[index]?.replace(/^"|"$/g, '').trim() || '';
+        const val = (values[index] || '').replace(/^"|"$/g, '').trim();
         if (header === 'data_abertura') obj.data_abertura = val;
         else if (header === 'hora_abertura') obj.hora_abertura = val;
         else if (header === 'marca') obj.marca = val;
@@ -31,10 +35,11 @@ export const fetchData = async (): Promise<TicketData[]> => {
       });
       return obj as TicketData;
     }).filter(item => {
-      // Filtering out "SUM" rows or error indicators from the spreadsheet bottom
-      const isMarcaSum = item.marca?.toLowerCase() === 'sum';
-      const isDataSum = item.data_abertura?.toLowerCase() === 'sum';
-      return item.marca && !isMarcaSum && !isDataSum;
+      // Filtering out invalid rows
+      if (!item || !item.marca || !item.data_abertura) return false;
+      const isMarcaSum = item.marca.toLowerCase() === 'sum';
+      const isDataSum = item.data_abertura.toLowerCase() === 'sum';
+      return !isMarcaSum && !isDataSum;
     });
   } catch (error) {
     console.error('Error fetching data:', error);
@@ -43,25 +48,26 @@ export const fetchData = async (): Promise<TicketData[]> => {
 };
 
 export const getLastUpdateInfo = (data: TicketData[]) => {
-  if (data.length === 0) return "Sem dados";
+  if (!data || data.length === 0) return "Sem dados";
   
-  // Find the most recent record by date and time
-  const sorted = [...data].sort((a, b) => {
-    const parseDateTime = (d: string, t?: string) => {
-      const parts = d.split(/[-/]/);
-      if (parts.length < 3) return new Date(0);
-      const [dia, mes, ano] = parts;
-      // Convert DD/MM/YYYY or DD-MM-YYYY to YYYY-MM-DD for standard Date constructor
-      const isoDate = `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
-      return new Date(`${isoDate}T${t || '00:00:00'}`);
-    };
+  const parseDateTime = (d: string, t?: string) => {
+    if (!d) return new Date(0);
+    const parts = d.split(/[-/]/);
+    if (parts.length < 3) return new Date(0);
+    const [dia, mes, ano] = parts;
+    const isoDate = `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+    const dt = new Date(`${isoDate}T${t || '00:00:00'}`);
+    return isNaN(dt.getTime()) ? new Date(0) : dt;
+  };
 
+  const sorted = [...data].sort((a, b) => {
     const dateA = parseDateTime(a.data_abertura, a.hora_abertura);
     const dateB = parseDateTime(b.data_abertura, b.hora_abertura);
     return dateB.getTime() - dateA.getTime();
   });
 
   const last = sorted[0];
+  if (!last) return "Sem dados";
   const timeInfo = last.hora_abertura ? ` às ${last.hora_abertura}` : '';
   return `${last.data_abertura}${timeInfo}`;
 };
@@ -78,9 +84,13 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
     detailCounts: {}
   };
 
+  if (!data || data.length === 0) return stats;
+
   const systemMap: Record<string, Set<string>> = {};
 
   data.forEach(item => {
+    if (!item) return;
+
     const brand = item.marca || 'Unknown';
     stats.brandCounts[brand] = (stats.brandCounts[brand] || 0) + 1;
 
@@ -98,7 +108,7 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
       else if (s.includes('FIDELIDADE')) system = 'FIDELIDADE';
       else if (s.includes('MYORDERS')) system = 'MYORDERS';
       else {
-        const parts = s.split(' ');
+        const parts = s.trim().split(' ');
         system = parts[parts.length - 1] || 'OUTROS';
       }
     }
@@ -107,7 +117,6 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
     const reason = item.categoria || 'Sem Categoria';
     stats.reasonCounts[reason] = (stats.reasonCounts[reason] || 0) + 1;
 
-    // Map systems to categories
     if (!systemMap[reason]) systemMap[reason] = new Set();
     systemMap[reason].add(system);
 
@@ -117,7 +126,6 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
     const period = item.turno || 'Sem Turno';
     stats.periodCounts[period] = (stats.periodCounts[period] || 0) + 1;
 
-    // Sanitized detailing logic
     const detail = item.detalhamento;
     const isInvalid = !detail || 
                      detail.toLowerCase().includes('sem detalha') || 
@@ -129,7 +137,6 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
     }
   });
 
-  // Convert Sets to Arrays for visual component
   Object.keys(systemMap).forEach(reason => {
     stats.categorySystems[reason] = Array.from(systemMap[reason]);
   });
