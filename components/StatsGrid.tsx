@@ -19,7 +19,8 @@ const StatsGrid: React.FC<StatsGridProps> = ({ stats, selectedBrand, onBrandClic
   ];
 
   const getBrandCount = (brandSearch: string) => {
-    const total = Object.entries(stats.brandCounts).reduce((acc, [key, count]) => {
+    // Cast Object.entries to [string, number][] to fix the operator '+' error where count was inferred as unknown
+    const total = (Object.entries(stats.brandCounts) as [string, number][]).reduce((acc, [key, count]) => {
       if (key.toLowerCase().includes(brandSearch.toLowerCase())) {
         return acc + count;
       }

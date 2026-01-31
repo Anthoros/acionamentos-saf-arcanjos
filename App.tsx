@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchData, calculateStats } from './services/dataService';
+import { fetchData, calculateStats, getLastUpdateInfo } from './services/dataService';
 import { TicketData, DashboardStats } from './types';
 import Header from './components/Header';
 import StatsGrid from './components/StatsGrid';
@@ -15,8 +15,9 @@ const App: React.FC = () => {
   const [rawData, setRawData] = useState<TicketData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState('Últimos 7 Dias');
+  const [activeFilter, setActiveFilter] = useState('Últimos 7 dias');
   const [selectedBrand, setSelectedBrand] = useState('grupo trigo'); // Store the key
+  const [lastDataUpdate, setLastDataUpdate] = useState<string>('');
   const [drillDown, setDrillDown] = useState<{ type: string | null; value: string | null }>({
     type: null,
     value: null
@@ -31,6 +32,8 @@ const App: React.FC = () => {
           setError("Nenhum dado encontrado na planilha.");
         } else {
           setRawData(data);
+          // Calculate the timestamp of the last record in the sheet
+          setLastDataUpdate(getLastUpdateInfo(data));
         }
       } catch (err) {
         setError("Erro ao carregar os dados.");
@@ -49,8 +52,7 @@ const App: React.FC = () => {
     if (rawData.length === 0) return [];
 
     const agora = new Date();
-    const dataLimite = new Date(agora);
-    dataLimite.setHours(23, 59, 59, 999);
+    const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
 
     return rawData.filter(item => {
       if (!item.data_abertura) return false;
@@ -61,35 +63,67 @@ const App: React.FC = () => {
       const [dia, mes, ano] = parts;
       const dataTicket = new Date(ano, mes - 1, dia);
 
-      if (dataTicket > dataLimite) return false;
+      let timePass = false;
 
-      if (activeFilter === 'Hoje') {
-        return dataTicket.toDateString() === agora.toDateString();
-      } else if (activeFilter === 'Últimos 7 Dias') {
-        const d = new Date(agora);
-        d.setDate(agora.getDate() - 7);
-        d.setHours(0, 0, 0, 0);
-        return dataTicket >= d;
-      } else if (activeFilter === 'Este Mês') {
-        return dataTicket.getMonth() === agora.getMonth() && 
-               dataTicket.getFullYear() === agora.getFullYear();
-      } else if (activeFilter === 'Trimestral') {
-        const d = new Date(agora);
-        d.setMonth(agora.getMonth() - 3);
-        d.setHours(0, 0, 0, 0);
-        return dataTicket >= d;
-      } else if (activeFilter === 'Anual') {
-        const d = new Date(agora);
-        d.setFullYear(agora.getFullYear() - 1);
-        d.setHours(0, 0, 0, 0);
-        return dataTicket >= d;
+      switch (activeFilter) {
+        case 'Hoje':
+          timePass = dataTicket.getTime() === hoje.getTime();
+          break;
+        case 'Ontem':
+          const ontem = new Date(hoje);
+          ontem.setDate(hoje.getDate() - 1);
+          timePass = dataTicket.getTime() === ontem.getTime();
+          break;
+        case 'Últimos 7 dias':
+          const seteDias = new Date(hoje);
+          seteDias.setDate(hoje.getDate() - 7);
+          timePass = dataTicket >= seteDias && dataTicket <= hoje;
+          break;
+        case 'Últimos 30 dias':
+          const trintaDias = new Date(hoje);
+          trintaDias.setDate(hoje.getDate() - 30);
+          timePass = dataTicket >= trintaDias && dataTicket <= hoje;
+          break;
+        case 'Últimos 90 dias':
+          const noventaDias = new Date(hoje);
+          noventaDias.setDate(hoje.getDate() - 90);
+          timePass = dataTicket >= noventaDias && dataTicket <= hoje;
+          break;
+        case 'Últimos 12 meses':
+          const umAnoAtras = new Date(hoje);
+          umAnoAtras.setFullYear(hoje.getFullYear() - 1);
+          timePass = dataTicket >= umAnoAtras && dataTicket <= hoje;
+          break;
+        case 'Esta semana':
+          // Finding first day of current week (Sunday)
+          const primeiroDiaSemana = new Date(hoje);
+          primeiroDiaSemana.setDate(hoje.getDate() - hoje.getDay());
+          timePass = dataTicket >= primeiroDiaSemana && dataTicket <= hoje;
+          break;
+        case 'Este mês':
+          timePass = dataTicket.getMonth() === hoje.getMonth() && 
+                     dataTicket.getFullYear() === hoje.getFullYear();
+          break;
+        case 'Mês anterior':
+          const mesAnterior = hoje.getMonth() === 0 ? 11 : hoje.getMonth() - 1;
+          const anoDoMesAnterior = hoje.getMonth() === 0 ? hoje.getFullYear() - 1 : hoje.getFullYear();
+          timePass = dataTicket.getMonth() === mesAnterior && 
+                     dataTicket.getFullYear() === anoDoMesAnterior;
+          break;
+        case 'Este ano':
+          timePass = dataTicket.getFullYear() === hoje.getFullYear();
+          break;
+        case 'Ano anterior':
+          timePass = dataTicket.getFullYear() === hoje.getFullYear() - 1;
+          break;
+        default:
+          timePass = true;
       }
-      return true;
+      return timePass;
     });
   }, [rawData, activeFilter]);
 
   // Filter stage 2: Drilldown (Search/Unit/System)
-  // This data will be used for the Top Stats Cards
   const drillDownFilteredData = useMemo(() => {
     let data = [...timeFilteredData];
 
@@ -109,7 +143,6 @@ const App: React.FC = () => {
   }, [timeFilteredData, drillDown]);
 
   // Filter stage 3: Brand selection
-  // This final data is for the charts
   const finalFilteredData = useMemo(() => {
     let data = [...drillDownFilteredData];
 
@@ -122,9 +155,7 @@ const App: React.FC = () => {
     return data;
   }, [drillDownFilteredData, selectedBrand]);
 
-  // Use drillDownFilteredData for cards so they react to store search
   const statsForGrid = useMemo(() => calculateStats(drillDownFilteredData), [drillDownFilteredData]);
-  // Use finalFilteredData for charts so they react to both store and brand
   const statsForCharts = useMemo(() => calculateStats(finalFilteredData), [finalFilteredData]);
 
   const allUniqueStores = useMemo(() => {
@@ -142,7 +173,6 @@ const App: React.FC = () => {
 
   const handleBrandClick = (brandKey: string) => {
     setSelectedBrand(brandKey);
-    // Keep the unit filter active when switching brands
   };
 
   const handleStoreSelect = (store: string) => {
@@ -152,7 +182,7 @@ const App: React.FC = () => {
   const clearAllFilters = () => {
     setDrillDown({ type: null, value: null });
     setSelectedBrand('grupo trigo');
-    setActiveFilter('Últimos 7 Dias');
+    setActiveFilter('Últimos 7 dias');
   };
 
   if (loading) {
@@ -198,7 +228,7 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-4">
-            {(drillDown.value || selectedBrand !== 'grupo trigo' || activeFilter !== 'Últimos 7 Dias') && (
+            {(drillDown.value || selectedBrand !== 'grupo trigo' || activeFilter !== 'Últimos 7 dias') && (
               <button 
                 onClick={clearAllFilters}
                 className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 transition-all uppercase tracking-widest bg-red-400/10 px-4 py-2 rounded-lg border border-red-400/20 active:scale-95"
@@ -208,8 +238,8 @@ const App: React.FC = () => {
               </button>
             )}
             <div className="text-right hidden sm:block border-l border-slate-800 pl-4">
-              <p className="text-[10px] text-secondary-text uppercase tracking-widest font-black">Sincronizado em</p>
-              <p className="text-sm font-bold text-accent-cyan">{new Date().toLocaleTimeString()}</p>
+              <p className="text-[10px] text-secondary-text uppercase tracking-widest font-black">Último dado na planilha</p>
+              <p className="text-sm font-bold text-accent-cyan">{lastDataUpdate || 'Carregando...'}</p>
             </div>
           </div>
         </div>
@@ -239,11 +269,13 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               <SystemDistribution 
                 stats={statsForCharts} 
+                tickets={finalFilteredData}
                 onDrillDown={handleDrillDown} 
                 activeDrill={drillDown}
               />
               <TopReasons 
                 stats={statsForCharts} 
+                tickets={finalFilteredData}
                 onDrillDown={handleDrillDown} 
                 activeDrill={drillDown}
               />
@@ -252,11 +284,13 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <TopStores 
                 stats={statsForCharts} 
+                tickets={finalFilteredData}
                 onDrillDown={handleDrillDown} 
                 activeDrill={drillDown}
               />
               <PeriodDistribution 
                 stats={statsForCharts} 
+                tickets={finalFilteredData}
                 onDrillDown={handleDrillDown} 
                 activeDrill={drillDown}
               />

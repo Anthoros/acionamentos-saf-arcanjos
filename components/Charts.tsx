@@ -1,15 +1,16 @@
 
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { DashboardStats } from '../types';
+import { DashboardStats, TicketData } from '../types';
 
 interface ChartProps {
   stats: DashboardStats;
+  tickets: TicketData[];
   onDrillDown: (type: string, value: string) => void;
   activeDrill: { type: string | null; value: string | null };
 }
 
-const SYSTEM_COLORS: Record<string, string> = {
+export const SYSTEM_COLORS: Record<string, string> = {
   'GCOM': '#3b82f6',
   'VIDEOSOFT': '#22d3ee',
   'TRIGO': '#f7ba47',
@@ -143,7 +144,7 @@ export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeDri
           </button>
         )}
       </h3>
-      <div className="flex flex-col justify-between flex-1 pb-2 gap-1 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="flex-1 flex flex-col justify-between pb-2 gap-1 animate-in fade-in slide-in-from-bottom-2 duration-500 overflow-y-auto custom-scrollbar">
         {sortedReasons.map(([name, count], idx) => (
           <button 
             key={idx} 
@@ -152,7 +153,23 @@ export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeDri
             disabled={isDetailMode}
           >
             <div className="flex justify-between text-[10px] mb-1 uppercase font-black tracking-tight">
-              <span className={`truncate pr-4 max-w-[85%] transition-colors ${activeDrill.value === name && !isDetailMode ? 'text-accent-cyan' : 'text-slate-400 group-hover:text-slate-100'}`}>{name}</span>
+              <span className={`truncate pr-4 max-w-[85%] transition-colors ${activeDrill.value === name && !isDetailMode ? 'text-accent-cyan' : 'text-slate-400 group-hover:text-slate-100'}`}>
+                {name}
+                {!isDetailMode && stats.categorySystems[name] && (
+                  <span className="ml-1 opacity-90 italic font-normal text-[9px]">
+                    (
+                    {stats.categorySystems[name].map((sys, i) => (
+                      <span 
+                        key={sys} 
+                        style={{ color: SYSTEM_COLORS[sys] || '#94a3b8' }}
+                      >
+                        {sys}{i < stats.categorySystems[name].length - 1 ? ', ' : ''}
+                      </span>
+                    ))}
+                    )
+                  </span>
+                )}
+              </span>
               <span className="text-white shrink-0 font-display">{count}</span>
             </div>
             <div className="w-full bg-slate-900/50 h-2 rounded-full overflow-hidden border border-slate-800/50">
@@ -174,37 +191,97 @@ export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeDri
   );
 };
 
-export const TopStores: React.FC<ChartProps> = ({ stats, onDrillDown, activeDrill }) => {
+export const TopStores: React.FC<ChartProps> = ({ stats, tickets, onDrillDown, activeDrill }) => {
+  const isStoreMode = activeDrill.type === 'unidade';
+
+  const parseDateTime = (d: string, t?: string) => {
+    const parts = d.split(/[-/]/);
+    if (parts.length < 3) return new Date(0);
+    const [dia, mes, ano] = parts;
+    const isoDate = `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+    return new Date(`${isoDate}T${t || '00:00:00'}`);
+  };
+
+  const recentTickets = [...tickets].sort((a, b) => {
+    const dateA = parseDateTime(a.data_abertura, a.hora_abertura);
+    const dateB = parseDateTime(b.data_abertura, b.hora_abertura);
+    return dateB.getTime() - dateA.getTime();
+  }).slice(0, 10);
+
   const sortedStores = (Object.entries(stats.storeCounts) as [string, number][])
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
 
   return (
-    <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm min-h-[600px] flex flex-col">
+    <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm h-[550px] flex flex-col overflow-hidden">
       <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
-        <span className="material-symbols-outlined text-primary">store</span>
-        Unidades com maior volume
-      </h3>
-      <div className="flex-1 flex flex-col gap-2 pb-2">
-        {sortedStores.map(([name, count], idx) => (
+        <span className="material-symbols-outlined text-primary">
+          {isStoreMode ? 'history' : 'store'}
+        </span>
+        <span className="truncate">
+          {isStoreMode ? `Últimos Chamados: ${activeDrill.value}` : 'Unidades com maior volume'}
+        </span>
+        {isStoreMode && (
           <button 
-            key={idx} 
-            onClick={() => onDrillDown('unidade', name)}
-            className={`flex items-center justify-between p-3 rounded-lg border transition-all group active:scale-[0.98] ${
-              activeDrill.value === name ? 'bg-primary/20 border-primary shadow-lg shadow-primary/10' : 'bg-slate-800/40 border-slate-700/30 hover:bg-card-dark'
-            }`}
+            onClick={() => onDrillDown('unidade', activeDrill.value!)}
+            className="ml-auto text-[10px] bg-slate-700 hover:bg-primary text-white px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all shrink-0 font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-black/20"
           >
-            <div className="flex items-center gap-3">
-              <span className={`flex items-center justify-center size-6 rounded-full ${idx === 0 || activeDrill.value === name ? 'bg-primary text-white shadow-md shadow-primary/20' : 'bg-slate-700/50 text-slate-400'} font-black text-[10px]`}>
-                {idx + 1}
-              </span>
-              <p className={`text-[11px] font-bold uppercase truncate transition-colors ${activeDrill.value === name ? 'text-primary' : 'text-slate-200 group-hover:text-accent-cyan'}`}>{name}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-black text-white">{count}</p>
-            </div>
+            <span className="material-symbols-outlined text-[14px]">arrow_back</span>
+            VOLTAR
           </button>
-        ))}
+        )}
+      </h3>
+      <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar">
+        {isStoreMode ? (
+          recentTickets.length > 0 ? (
+            recentTickets.map((t, idx) => (
+              <div key={idx} className="p-3 rounded-lg bg-slate-800/40 border border-slate-700/30 flex flex-col gap-1.5 animate-in fade-in slide-in-from-right-2 duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-black text-accent-cyan uppercase tracking-wider">
+                    {t.data_abertura} {t.hora_abertura && `• ${t.hora_abertura}`}
+                  </span>
+                  <span 
+                    className="text-[9px] font-black px-2 py-0.5 rounded bg-slate-900/80 border border-slate-700/50 uppercase" 
+                    style={{ color: SYSTEM_COLORS[t.sistema?.toUpperCase()] || '#94a3b8' }}
+                  >
+                    {t.sistema}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <p className="text-[11px] font-bold text-slate-100 uppercase leading-tight">{t.categoria}</p>
+                  <p className="text-[10px] text-slate-400 mt-1 line-clamp-2 italic leading-relaxed">
+                    {t.detalhamento || 'Sem detalhamento adicional informado.'}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-500 italic text-sm py-10">
+              <span className="material-symbols-outlined text-5xl mb-3 opacity-10">event_busy</span>
+              Nenhum chamado recente encontrado
+            </div>
+          )
+        ) : (
+          sortedStores.map(([name, count], idx) => (
+            <button 
+              key={idx} 
+              onClick={() => onDrillDown('unidade', name)}
+              className={`flex items-center justify-between p-3 rounded-lg border transition-all group active:scale-[0.98] ${
+                activeDrill.value === name ? 'bg-primary/20 border-primary shadow-lg shadow-primary/10' : 'bg-slate-800/40 border-slate-700/30 hover:bg-card-dark'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className={`flex items-center justify-center size-6 rounded-full ${idx === 0 || activeDrill.value === name ? 'bg-primary text-white shadow-md shadow-primary/20' : 'bg-slate-700/50 text-slate-400'} font-black text-[10px]`}>
+                  {idx + 1}
+                </span>
+                <p className={`text-[11px] font-bold uppercase truncate transition-colors ${activeDrill.value === name ? 'text-primary' : 'text-slate-200 group-hover:text-accent-cyan'}`}>{name}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-black text-white">{count}</p>
+              </div>
+            </button>
+          ))
+        )}
       </div>
     </div>
   );
@@ -229,7 +306,7 @@ export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
   });
 
   return (
-    <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm h-[600px] flex flex-col">
+    <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm h-[550px] flex flex-col">
       <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
         <span className="material-symbols-outlined text-primary">schedule</span>
         Volume por Período

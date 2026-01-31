@@ -12,7 +12,22 @@ const Header: React.FC<HeaderProps> = ({ activeFilter, onFilterChange, allStores
   const [searchTerm, setSearchTerm] = useState('');
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
-  const timeFilters = ['Hoje', 'Últimos 7 Dias', 'Este Mês', 'Trimestral', 'Anual'];
+
+  const timeFilters = [
+    { label: 'Últimos 7 dias', value: '7d' },
+    { label: 'Últimos 30 dias', value: '30d' },
+    { label: 'Últimos 90 dias', value: '90d' },
+    { label: 'Últimos 12 meses', value: '12m' },
+    { divider: true },
+    { label: 'Hoje', value: 'hoje' },
+    { label: 'Ontem', value: 'ontem' },
+    { label: 'Esta semana', value: 'semana_atual' },
+    { label: 'Este mês', value: 'mes_atual' },
+    { label: 'Este ano', value: 'ano_atual' },
+    { divider: true },
+    { label: 'Mês anterior', value: 'mes_anterior' },
+    { label: 'Ano anterior', value: 'ano_anterior' }
+  ];
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -87,18 +102,22 @@ const Header: React.FC<HeaderProps> = ({ activeFilter, onFilterChange, allStores
             <span className="text-sm font-bold hidden sm:inline">{activeFilter}</span>
             <span className="material-symbols-outlined text-sm">expand_more</span>
           </button>
-          <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 absolute right-0 mt-2 w-48 bg-surface-dark border border-slate-700 rounded-lg shadow-xl z-[60] overflow-hidden transition-all duration-200">
-            {timeFilters.map((filter) => (
-              <button
-                key={filter}
-                onClick={() => onFilterChange(filter)}
-                className={`block w-full text-left px-4 py-2.5 text-sm transition-colors border-b border-slate-700/50 last:border-0 ${
-                  activeFilter === filter ? 'bg-accent-cyan text-slate-900 font-bold' : 'text-slate-200 hover:bg-slate-700'
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
+          <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 absolute right-0 mt-2 w-56 bg-surface-dark border border-slate-700 rounded-lg shadow-xl z-[60] overflow-hidden transition-all duration-200">
+            <div className="max-h-[70vh] overflow-y-auto">
+              {timeFilters.map((f, i) => f.divider ? (
+                <div key={i} className="border-t border-slate-700/50 my-1" />
+              ) : (
+                <button
+                  key={f.value}
+                  onClick={() => onFilterChange(f.label)}
+                  className={`block w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                    activeFilter === f.label ? 'bg-accent-cyan text-slate-900 font-bold' : 'text-slate-200 hover:bg-slate-700'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 
 export interface TicketData {
   data_abertura: string;
+  hora_abertura?: string;
   marca: string;
   sistema: string;
   categoria: string;
@@ -14,6 +15,7 @@ export interface DashboardStats {
   brandCounts: Record<string, number>;
   systemCounts: Record<string, number>;
   reasonCounts: Record<string, number>;
+  categorySystems: Record<string, string[]>;
   storeCounts: Record<string, number>;
   periodCounts: Record<string, number>;
   detailCounts: Record<string, number>;
