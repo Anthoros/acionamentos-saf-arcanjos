@@ -50,9 +50,11 @@ const Header: React.FC<HeaderProps> = ({ activeFilter, onFilterChange, allStores
   return (
     <header className="flex flex-col md:flex-row items-center justify-between border-b border-solid border-slate-800 px-8 py-4 bg-background-dark sticky top-0 z-50 gap-4">
       <div className="flex items-center gap-3 shrink-0">
-        <div className="p-2 bg-primary rounded-lg text-white">
-          <span className="material-symbols-outlined text-2xl">monitoring</span>
-        </div>
+        <img 
+          src="https://api-zendesk-arcanjos.replit.app/assets/LOGOARC_1749750824381-DFtw5VI2.png" 
+          alt="Logo Arcanjos" 
+          className="h-10 w-auto object-contain"
+        />
         <h2 className="text-lg md:text-xl font-bold tracking-tight text-white uppercase">
           Controle de Acionamentos SAF Arcanjos
         </h2>
