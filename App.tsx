@@ -243,7 +243,7 @@ const App: React.FC = () => {
         onStoreSelect={handleStoreSelect}
       />
       
-      <main className="flex-1 p-4 md:p-8 max-w-[1440px] mx-auto w-full">
+      <main className="flex-1 p-4 md:p-6 lg:p-10 max-w-[1600px] mx-auto w-full transition-all duration-500">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
           <div className="flex flex-col">
             <h1 className="text-2xl font-bold text-white flex items-center gap-3">
@@ -318,7 +318,7 @@ const App: React.FC = () => {
           </div>
         ) : (
           <div className="animate-in fade-in duration-500">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 mb-8">
               <SystemDistribution 
                 stats={statsForCharts} 
                 tickets={filteredData.finalData}
@@ -333,7 +333,7 @@ const App: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
               <TopStores 
                 stats={statsForCharts} 
                 tickets={filteredData.finalData}

@@ -282,25 +282,34 @@ export const TopStores: React.FC<ChartProps> = ({ stats, tickets, onDrillDown, a
             </div>
           )
         ) : (
-          sortedStores.map(([name, count], idx) => (
-            <button 
-              key={idx} 
-              onClick={() => onDrillDown('unidade', name)}
-              className={`flex items-center justify-between p-3 rounded-lg border transition-all group active:scale-[0.98] ${
-                activeFilters.unidade === name ? 'bg-primary/20 border-primary shadow-lg shadow-primary/10' : 'bg-slate-800/40 border-slate-700/30 hover:bg-card-dark'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span className={`flex items-center justify-center size-6 rounded-full ${idx === 0 || activeFilters.unidade === name ? 'bg-primary text-white shadow-md shadow-primary/20' : 'bg-slate-700/50 text-slate-400'} font-black text-[10px]`}>
-                  {idx + 1}
-                </span>
-                <p className={`text-[11px] font-bold uppercase truncate transition-colors ${activeFilters.unidade === name ? 'text-primary' : 'text-slate-200 group-hover:text-accent-cyan'}`}>{name}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-black text-white">{count}</p>
-              </div>
-            </button>
-          ))
+          sortedStores.map(([name, count], idx) => {
+            const brandShare = stats.totalTickets > 0 
+              ? ((count / stats.totalTickets) * 100).toFixed(1) 
+              : '0.0';
+
+            return (
+              <button 
+                key={idx} 
+                onClick={() => onDrillDown('unidade', name)}
+                className={`flex items-center justify-between p-3 rounded-lg border transition-all group active:scale-[0.98] ${
+                  activeFilters.unidade === name ? 'bg-primary/20 border-primary shadow-lg shadow-primary/10' : 'bg-slate-800/40 border-slate-700/30 hover:bg-card-dark'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`flex items-center justify-center size-6 rounded-full ${idx === 0 || activeFilters.unidade === name ? 'bg-primary text-white shadow-md shadow-primary/20' : 'bg-slate-700/50 text-slate-400'} font-black text-[10px]`}>
+                    {idx + 1}
+                  </span>
+                  <p className={`text-[11px] font-bold uppercase truncate transition-colors ${activeFilters.unidade === name ? 'text-primary' : 'text-slate-200 group-hover:text-accent-cyan'}`}>{name}</p>
+                </div>
+                <div className="text-right flex flex-col items-end">
+                  <p className="text-sm font-black text-white">{count}</p>
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
+                    {brandShare}% da marca
+                  </p>
+                </div>
+              </button>
+            );
+          })
         )}
       </div>
     </div>
@@ -324,6 +333,8 @@ export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
     const order = ['Manhã', 'Tarde', 'Noite', 'Madrugada'];
     return order.indexOf(a.name) - order.indexOf(b.name);
   });
+
+  const total = data.reduce((acc, curr) => acc + curr.value, 0);
 
   return (
     <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm h-[550px] flex flex-col">
@@ -373,6 +384,15 @@ export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
               align="center" 
               wrapperStyle={{ paddingTop: '15px', cursor: 'pointer' }}
               onClick={(e) => onDrillDown('turno', e.value)}
+              formatter={(value) => {
+                const item = data.find(d => d.name === value);
+                const percentage = total > 0 ? ((item?.value || 0) / total * 100).toFixed(1) : '0.0';
+                return (
+                  <span className="text-slate-300 text-[11px] font-medium">
+                    {value} <span className="text-slate-500 ml-1">({percentage}%)</span>
+                  </span>
+                );
+              }}
             />
           </PieChart>
         </ResponsiveContainer>

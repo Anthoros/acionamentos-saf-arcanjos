@@ -3,6 +3,15 @@ import { TicketData, DashboardStats } from '../types.ts';
 
 const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSgDdiQWX1AhvT_MdzZ2EYpVKi_EmwKdW6tRRfbaR0JTEUmIIGPgO3DL_f3una601MrZMPOQYI8qWJw/pub?gid=252607289&single=true&output=csv';
 
+const TOTAL_STORES_MAP: Record<string, number> = {
+  'spoleto': 416,
+  'asa': 17,
+  'china in box': 160,
+  'koni': 41,
+  'gendai': 121,
+  'grupo trigo': 755 // Soma de todos
+};
+
 export const fetchData = async (): Promise<TicketData[]> => {
   try {
     const response = await fetch(SPREADSHEET_URL);
@@ -81,18 +90,46 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
     categorySystems: {},
     storeCounts: {},
     periodCounts: {},
-    detailCounts: {}
+    detailCounts: {},
+    uniqueStoreCounts: {},
+    totalStoresMap: TOTAL_STORES_MAP
   };
 
   if (!data || data.length === 0) return stats;
 
   const systemMap: Record<string, Set<string>> = {};
+  const uniqueStoresByBrand: Record<string, Set<string>> = {
+    'grupo trigo': new Set<string>()
+  };
 
   data.forEach(item => {
     if (!item) return;
 
-    const brand = item.marca || 'Unknown';
-    stats.brandCounts[brand] = (stats.brandCounts[brand] || 0) + 1;
+    const rawBrand = item.marca || 'Unknown';
+    let brand = rawBrand.toLowerCase();
+    
+    // Normalization logic for matching TOTAL_STORES_MAP
+    if (brand.includes('china')) brand = 'china in box';
+    if (brand.includes('spoleto')) brand = 'spoleto';
+    if (brand.includes('koni')) brand = 'koni';
+    if (brand.includes('gendai')) brand = 'gendai';
+    if (brand.includes('asa')) brand = 'asa';
+
+    stats.brandCounts[rawBrand] = (stats.brandCounts[rawBrand] || 0) + 1;
+
+    // Normalização agressiva da unidade
+    const store = item.unidade
+      ?.toUpperCase()
+      .replace(/\s+/g, ' ')
+      .replace(/[-]/g, '')
+      .trim();
+
+    // Ignora linhas de "SUM" ou vazias que podem vir da planilha
+    if (store && store !== 'SUM' && store !== 'TOTAL') {
+      if (!uniqueStoresByBrand[brand]) uniqueStoresByBrand[brand] = new Set();
+      uniqueStoresByBrand[brand].add(store);
+      uniqueStoresByBrand['grupo trigo'].add(`${brand}-${store}`);
+    }
 
     let system = 'OUTROS';
     if (item.sistema) {
@@ -120,8 +157,8 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
     if (!systemMap[reason]) systemMap[reason] = new Set();
     systemMap[reason].add(system);
 
-    const store = item.unidade || 'Sem Unidade';
-    stats.storeCounts[store] = (stats.storeCounts[store] || 0) + 1;
+    const storeForCounts = item.unidade || 'Sem Unidade';
+    stats.storeCounts[storeForCounts] = (stats.storeCounts[storeForCounts] || 0) + 1;
 
     const period = item.turno || 'Sem Turno';
     stats.periodCounts[period] = (stats.periodCounts[period] || 0) + 1;
@@ -139,6 +176,11 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
 
   Object.keys(systemMap).forEach(reason => {
     stats.categorySystems[reason] = Array.from(systemMap[reason]);
+  });
+
+  // Convert Sets to counts for the uniqueStoreCounts stat
+  Object.keys(uniqueStoresByBrand).forEach(brandKey => {
+    stats.uniqueStoreCounts[brandKey] = uniqueStoresByBrand[brandKey].size;
   });
 
   return stats;

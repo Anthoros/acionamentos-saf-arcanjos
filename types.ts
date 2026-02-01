@@ -19,4 +19,6 @@ export interface DashboardStats {
   storeCounts: Record<string, number>;
   periodCounts: Record<string, number>;
   detailCounts: Record<string, number>;
+  uniqueStoreCounts: Record<string, number>;
+  totalStoresMap: Record<string, number>;
 }
