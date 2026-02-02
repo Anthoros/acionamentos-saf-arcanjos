@@ -21,4 +21,5 @@ export interface DashboardStats {
   detailCounts: Record<string, number>;
   uniqueStoreCounts: Record<string, number>;
   totalStoresMap: Record<string, number>;
+  storeToBrandMap: Record<string, string>;
 }

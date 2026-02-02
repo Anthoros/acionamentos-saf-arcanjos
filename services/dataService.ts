@@ -92,7 +92,8 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
     periodCounts: {},
     detailCounts: {},
     uniqueStoreCounts: {},
-    totalStoresMap: TOTAL_STORES_MAP
+    totalStoresMap: TOTAL_STORES_MAP,
+    storeToBrandMap: {}
   };
 
   if (!data || data.length === 0) return stats;
@@ -108,6 +109,11 @@ export const calculateStats = (data: TicketData[]): DashboardStats => {
     const rawBrand = item.marca || 'Unknown';
     let brand = rawBrand.toLowerCase();
     
+    // Armazena o vínculo oficial entre unidade e marca
+    if (item.unidade && item.marca) {
+      stats.storeToBrandMap[item.unidade] = rawBrand;
+    }
+
     // Normalization logic for matching TOTAL_STORES_MAP
     if (brand.includes('china')) brand = 'china in box';
     if (brand.includes('spoleto')) brand = 'spoleto';

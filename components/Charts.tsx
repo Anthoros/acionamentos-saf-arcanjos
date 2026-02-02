@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { DashboardStats, TicketData } from '../types';
 
@@ -8,6 +8,7 @@ interface ChartProps {
   tickets: TicketData[];
   onDrillDown: (type: string, value: string) => void;
   activeFilters: Record<string, string>;
+  selectedBrand?: string;
 }
 
 export const SYSTEM_COLORS: Record<string, string> = {
@@ -61,7 +62,7 @@ export const SystemDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
-  const total = data.reduce((acc, curr) => acc + curr.value, 0);
+  const total = stats.totalTickets;
 
   return (
     <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm flex flex-col h-[550px]">
@@ -142,6 +143,8 @@ export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeFil
     .slice(0, 10);
 
   const maxVal = Math.max(...sortedReasons.map(r => r[1]), 1);
+  
+  const cardTotal = (Object.values(dataSource) as number[]).reduce((acc: number, curr: number) => acc + curr, 0);
 
   return (
     <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm h-[550px] flex flex-col transition-all duration-300">
@@ -164,41 +167,48 @@ export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeFil
         )}
       </h3>
       <div className="flex-1 flex flex-col justify-between pb-2 gap-1 animate-in fade-in slide-in-from-bottom-2 duration-500 overflow-y-auto custom-scrollbar">
-        {sortedReasons.map(([name, count], idx) => (
-          <button 
-            key={idx} 
-            onClick={() => !isDetailMode && onDrillDown('categoria', name)}
-            className={`relative w-full text-left group transition-all p-1.5 rounded-lg ${isDetailMode ? 'cursor-default' : 'cursor-pointer hover:bg-slate-800/40'}`}
-            disabled={isDetailMode}
-          >
-            <div className="flex justify-between text-[10px] mb-1 uppercase font-black tracking-tight">
-              <span className={`truncate pr-4 max-w-[85%] transition-colors ${activeFilters.categoria === name && !isDetailMode ? 'text-accent-cyan' : 'text-slate-400 group-hover:text-slate-100'}`}>
-                {name}
-                {!isDetailMode && stats.categorySystems[name] && (
-                  <span className="ml-1 opacity-90 italic font-normal text-[9px]">
-                    (
-                    {stats.categorySystems[name].map((sys, i) => (
-                      <span 
-                        key={sys} 
-                        style={{ color: SYSTEM_COLORS[sys] || '#94a3b8' }}
-                      >
-                        {sys}{i < stats.categorySystems[name].length - 1 ? ', ' : ''}
-                      </span>
-                    ))}
-                    )
-                  </span>
-                )}
-              </span>
-              <span className="text-white shrink-0 font-display">{count}</span>
-            </div>
-            <div className="w-full bg-slate-900/50 h-2 rounded-full overflow-hidden border border-slate-800/50">
-              <div 
-                className={`h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(59,130,246,0.3)] ${isDetailMode ? 'bg-accent-cyan' : 'bg-primary'}`} 
-                style={{ width: `${(count / maxVal) * 100}%` }}
-              ></div>
-            </div>
-          </button>
-        ))}
+        {sortedReasons.map(([name, count], idx) => {
+          const percentage = (cardTotal as number) > 0 ? ((count / (cardTotal as number)) * 100).toFixed(1) : '0.0';
+          
+          return (
+            <button 
+              key={idx} 
+              onClick={() => !isDetailMode && onDrillDown('categoria', name)}
+              className={`relative w-full text-left group transition-all p-1.5 rounded-lg ${isDetailMode ? 'cursor-default' : 'cursor-pointer hover:bg-slate-800/40'}`}
+              disabled={isDetailMode}
+            >
+              <div className="flex justify-between text-[10px] mb-1 uppercase font-black tracking-tight">
+                <span className={`truncate pr-4 max-w-[85%] transition-colors ${activeFilters.categoria === name && !isDetailMode ? 'text-accent-cyan' : 'text-slate-400 group-hover:text-slate-100'}`}>
+                  {name}
+                  {!isDetailMode && stats.categorySystems[name] && (
+                    <span className="ml-1 opacity-90 italic font-normal text-[9px]">
+                      (
+                      {stats.categorySystems[name].map((sys, i) => (
+                        <span 
+                          key={sys} 
+                          style={{ color: SYSTEM_COLORS[sys] || '#94a3b8' }}
+                        >
+                          {sys}{i < stats.categorySystems[name].length - 1 ? ', ' : ''}
+                        </span>
+                      ))}
+                      )
+                    </span>
+                  )}
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-slate-500 font-medium">({percentage}%)</span>
+                  <span className="text-white shrink-0 font-display">{count}</span>
+                </div>
+              </div>
+              <div className="w-full bg-slate-900/50 h-2 rounded-full overflow-hidden border border-slate-800/50">
+                <div 
+                  className={`h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(59,130,246,0.3)] ${isDetailMode ? 'bg-accent-cyan' : 'bg-primary'}`} 
+                  style={{ width: `${(count / maxVal) * 100}%` }}
+                ></div>
+              </div>
+            </button>
+          );
+        })}
         {sortedReasons.length === 0 && isDetailMode && (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-500 italic text-sm py-10">
             <span className="material-symbols-outlined text-5xl mb-3 opacity-10">inventory_2</span>
@@ -210,7 +220,7 @@ export const TopReasons: React.FC<ChartProps> = ({ stats, onDrillDown, activeFil
   );
 };
 
-export const TopStores: React.FC<ChartProps> = ({ stats, tickets, onDrillDown, activeFilters }) => {
+export const TopStores: React.FC<ChartProps> = ({ stats, tickets, onDrillDown, activeFilters, selectedBrand }) => {
   const isStoreMode = !!activeFilters.unidade;
 
   const parseDateTime = (d: string, t?: string) => {
@@ -231,26 +241,69 @@ export const TopStores: React.FC<ChartProps> = ({ stats, tickets, onDrillDown, a
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
 
+  // 1. Tradutor de Artigos Gramaticais
+  const getBrandArticle = (brand: string) => {
+    if (!brand) return 'DO';
+    const b = brand.toUpperCase();
+    if (b.includes('ASA')) return 'DA';
+    return 'DO'; // Padrão para Spoleto, China, Gendai, Koni
+  };
+
+  // 2. Lógica de Cor por Criticidade para o Badge
+  const getConcentrationColor = (pct: number) => {
+    if (pct > 50) return 'bg-red-500/20 text-red-500 border-red-500/50'; // Crítico
+    if (pct > 30) return 'bg-amber-500/20 text-amber-500 border-amber-500/50'; // Alerta
+    return 'bg-emerald-500/20 text-emerald-500 border-emerald-500/50'; // Saudável
+  };
+
+  // 3. Cálculo da Soma das Porcentagens (Pareto)
+  const topTenTotalPercentage = useMemo(() => {
+    const brandName = selectedBrand?.toLowerCase() || 'grupo trigo';
+    if (brandName === 'grupo trigo') return null;
+    
+    const brandTotal = stats.totalTickets; 
+    if (brandTotal === 0) return null;
+
+    const sum = sortedStores.reduce((acc, [_, count]) => acc + count, 0);
+    return ((sum / brandTotal) * 100).toFixed(1);
+  }, [sortedStores, stats.totalTickets, selectedBrand]);
+
   return (
     <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm h-[550px] flex flex-col overflow-hidden">
-      <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
-        <span className="material-symbols-outlined text-primary">
-          {isStoreMode ? 'history' : 'store'}
-        </span>
-        <span className="truncate">
-          {isStoreMode ? `Últimos Chamados` : 'Unidades com maior volume'}
-        </span>
+      <div className="flex items-start justify-between mb-6 w-full min-h-[52px]">
+        <div className="flex items-center gap-2 overflow-hidden mt-2">
+          <span className="material-symbols-outlined text-primary shrink-0">
+            {isStoreMode ? 'history' : 'store'}
+          </span>
+          <h3 className="text-lg font-bold text-white truncate">
+            {isStoreMode ? `Últimos Chamados` : 'Unidades com maior volume'}
+          </h3>
+        </div>
+        
+        {/* Novo Badge de Concentração Executivo */}
+        {!isStoreMode && topTenTotalPercentage && (
+          <div className={`flex flex-col items-end px-3 py-1.5 rounded-xl border backdrop-blur-md transition-all animate-in fade-in slide-in-from-right-4 duration-500 ${getConcentrationColor(parseFloat(topTenTotalPercentage))}`}>
+            <span className="text-[8px] font-black uppercase tracking-widest leading-none mb-1">Concentração de Volume</span>
+            <div className="flex items-center gap-1">
+              <span className="text-lg font-black leading-none">{topTenTotalPercentage}%</span>
+              <span className="material-symbols-outlined text-sm">analytics</span>
+            </div>
+            <span className="text-[7px] font-bold opacity-70 uppercase mt-0.5">Impacto das Top 10 Unidades</span>
+          </div>
+        )}
+
         {isStoreMode && (
           <button 
             onClick={() => onDrillDown('unidade', activeFilters.unidade)}
-            className="ml-auto flex items-center gap-1.5 text-[10px] bg-primary/20 hover:bg-primary/40 text-primary px-2.5 py-1.5 rounded-full border border-primary/30 transition-all group animate-in fade-in zoom-in-95 duration-200"
+            className="flex items-center gap-1.5 text-[10px] bg-primary/20 hover:bg-primary/40 text-primary px-2.5 py-1.5 rounded-full border border-primary/30 transition-all group animate-in fade-in zoom-in-95 duration-200 mt-2"
             title="Remover filtro de unidade"
           >
             <span className="font-black uppercase tracking-tighter truncate max-w-[120px]">{activeFilters.unidade}</span>
             <span className="material-symbols-outlined text-[14px] font-bold group-hover:rotate-90 transition-transform">close</span>
           </button>
         )}
-      </h3>
+      </div>
+
       <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar min-h-[300px] min-w-0">
         {isStoreMode ? (
           recentTickets.length > 0 ? (
@@ -283,8 +336,11 @@ export const TopStores: React.FC<ChartProps> = ({ stats, tickets, onDrillDown, a
           )
         ) : (
           sortedStores.map(([name, count], idx) => {
-            const brandShare = stats.totalTickets > 0 
-              ? ((count / stats.totalTickets) * 100).toFixed(1) 
+            const realBrandKey = stats.storeToBrandMap[name];
+            const article = getBrandArticle(realBrandKey || '');
+            const totalForThisBrand = (realBrandKey ? stats.brandCounts[realBrandKey] : stats.totalTickets) ?? stats.totalTickets;
+            const brandShare = (totalForThisBrand as number) > 0 
+              ? ((count / (totalForThisBrand as number)) * 100).toFixed(1) 
               : '0.0';
 
             return (
@@ -304,7 +360,7 @@ export const TopStores: React.FC<ChartProps> = ({ stats, tickets, onDrillDown, a
                 <div className="text-right flex flex-col items-end">
                   <p className="text-sm font-black text-white">{count}</p>
                   <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
-                    {brandShare}% da marca
+                    {brandShare}% {article} {realBrandKey?.toUpperCase() || 'MARCA'}
                   </p>
                 </div>
               </button>
@@ -334,7 +390,7 @@ export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
     return order.indexOf(a.name) - order.indexOf(b.name);
   });
 
-  const total = data.reduce((acc, curr) => acc + curr.value, 0);
+  const total = stats.totalTickets;
 
   return (
     <div className="bg-surface-dark p-6 rounded-xl border border-slate-800 shadow-sm h-[550px] flex flex-col">
@@ -386,7 +442,8 @@ export const PeriodDistribution: React.FC<ChartProps> = ({ stats, onDrillDown, a
               onClick={(e) => onDrillDown('turno', e.value)}
               formatter={(value) => {
                 const item = data.find(d => d.name === value);
-                const percentage = total > 0 ? ((item?.value || 0) / total * 100).toFixed(1) : '0.0';
+                const totalVal = (total as number) || 0;
+                const percentage = totalVal > 0 ? ((item?.value || 0) / totalVal * 100).toFixed(1) : '0.0';
                 return (
                   <span className="text-slate-300 text-[11px] font-medium">
                     {value} <span className="text-slate-500 ml-1">({percentage}%)</span>

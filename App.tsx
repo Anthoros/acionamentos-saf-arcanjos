@@ -54,10 +54,18 @@ const App: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        setLoading(true);
+        // Only show loading screen if we have no data yet (initial load)
+        if (rawData.length === 0) {
+          setLoading(true);
+        }
+
         const data = await fetchData();
         if (!data || data.length === 0) {
-          setError("Nenhum dado encontrado ou erro de conexão.");
+          // If it's the first attempt and it failed, show error screen
+          if (rawData.length === 0) {
+            setError("Nenhum dado encontrado ou erro de conexão.");
+          }
+          // If we already had data, we just keep it and don't overwrite with empty
         } else {
           setRawData(data);
           setLastDataUpdate(getLastUpdateInfo(data));
@@ -65,7 +73,10 @@ const App: React.FC = () => {
         }
       } catch (err) {
         console.error("Data load error", err);
-        setError("Erro ao carregar os dados. Verifique sua conexão.");
+        // Only show error screen if we don't have any data to show (first load)
+        if (rawData.length === 0) {
+          setError("Erro ao carregar os dados. Verifique sua conexão.");
+        }
       } finally {
         setLoading(false);
       }
@@ -74,7 +85,7 @@ const App: React.FC = () => {
     loadData();
     const interval = setInterval(loadData, 300000); // 5 min auto-refresh
     return () => clearInterval(interval);
-  }, []);
+  }, [rawData.length]); // Track rawData.length to know if initial load finished
 
   const filteredData = useMemo(() => {
     if (!rawData || rawData.length === 0) return { gridData: [], finalData: [] };
@@ -135,7 +146,6 @@ const App: React.FC = () => {
 
     const gridData = timeData.filter(item => {
       return Object.entries(activeFilters).every(([type, value]) => {
-        if (type === 'categoria') return true; 
         const key = type as keyof TicketData;
         const valStr = String(value);
         if (type === 'sistema') return (item.sistema?.toUpperCase() || '').includes(valStr.toUpperCase());
@@ -146,9 +156,6 @@ const App: React.FC = () => {
     const finalData = gridData.filter(item => {
       if (selectedBrand && selectedBrand !== 'grupo trigo') {
         if (!(item.marca?.toLowerCase() || '').includes(selectedBrand.toLowerCase())) return false;
-      }
-      if (activeFilters.categoria) {
-        if (item.categoria !== activeFilters.categoria) return false;
       }
       return true;
     });
@@ -171,7 +178,6 @@ const App: React.FC = () => {
       if (newFilters[type] === value) {
         delete newFilters[type];
         
-        // CASCADING RULE: If we remove 'sistema', we also clear 'categoria'
         if (type === 'sistema') {
           delete newFilters['categoria'];
         }
@@ -200,7 +206,6 @@ const App: React.FC = () => {
     setActiveFilters(prev => {
       const next = { ...prev };
       delete next[key];
-      // Cascading clear for system -> category here too
       if (key === 'sistema') {
         delete next['categoria'];
       }
@@ -324,12 +329,14 @@ const App: React.FC = () => {
                 tickets={filteredData.finalData}
                 onDrillDown={handleDrillDown} 
                 activeFilters={activeFilters}
+                selectedBrand={selectedBrand}
               />
               <TopReasons 
                 stats={statsForCharts} 
                 tickets={filteredData.finalData}
                 onDrillDown={handleDrillDown} 
                 activeFilters={activeFilters}
+                selectedBrand={selectedBrand}
               />
             </div>
 
@@ -339,12 +346,14 @@ const App: React.FC = () => {
                 tickets={filteredData.finalData}
                 onDrillDown={handleDrillDown} 
                 activeFilters={activeFilters}
+                selectedBrand={selectedBrand}
               />
               <PeriodDistribution 
                 stats={statsForCharts} 
                 tickets={filteredData.finalData}
                 onDrillDown={handleDrillDown} 
                 activeFilters={activeFilters}
+                selectedBrand={selectedBrand}
               />
             </div>
           </div>
